@@ -1,0 +1,90 @@
+import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction } from '../types/api';
+
+export interface ApiClient {
+  createOrder(order: CreateRuneOrderDto): Promise<void>;
+  getOrders(): Promise<RuneOrder[]>;
+  getOrderById(orderId: string): Promise<RuneOrder>;
+  createBatchOrders(orders: CreateBatchRuneOrderDto): Promise<void>;
+  getTokenBalances(): Promise<TokenBalance[]>;
+  getTransactions(): Promise<Transaction[]>;
+  getPendingTransactions(): Promise<Transaction[]>;
+  getPendingTransactionById(id: string): Promise<Transaction>;
+  deletePendingTransaction(id: string): Promise<void>;
+  deleteOrder(orderId: string): Promise<void>;
+}
+
+export class HttpApiClient implements ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  async createOrder(order: CreateRuneOrderDto): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    });
+    if (!response.ok) throw new Error('Failed to create order');
+  }
+
+  async getOrders(): Promise<RuneOrder[]> {
+    const response = await fetch(`${this.baseUrl}/orders`);
+    if (!response.ok) throw new Error('Failed to fetch orders');
+    return response.json();
+  }
+
+  async getOrderById(orderId: string): Promise<RuneOrder> {
+    const response = await fetch(`${this.baseUrl}/orders/${orderId}`);
+    if (!response.ok) throw new Error('Order not found');
+    return response.json();
+  }
+
+  async createBatchOrders(orders: CreateBatchRuneOrderDto): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/orders/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orders),
+    });
+    if (!response.ok) throw new Error('Failed to create batch orders');
+  }
+
+  async getTokenBalances(): Promise<TokenBalance[]> {
+    const response = await fetch(`${this.baseUrl}/account/balance`);
+    if (!response.ok) throw new Error('Failed to fetch token balances');
+    return response.json();
+  }
+
+  async getTransactions(): Promise<Transaction[]> {
+    const response = await fetch(`${this.baseUrl}/transactions`);
+    if (!response.ok) throw new Error('Failed to fetch transactions');
+    return response.json();
+  }
+
+  async getPendingTransactions(): Promise<Transaction[]> {
+    const response = await fetch(`${this.baseUrl}/pending-transactions`);
+    if (!response.ok) throw new Error('Failed to fetch pending transactions');
+    return response.json();
+  }
+
+  async getPendingTransactionById(id: string): Promise<Transaction> {
+    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch pending transaction');
+    return response.json();
+  }
+
+  async deletePendingTransaction(id: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete pending transaction');
+  }
+
+  async deleteOrder(orderId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/orders/${orderId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete order');
+  }
+}
