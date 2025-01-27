@@ -32,12 +32,19 @@ export interface Transaction {
   orderId: string;
   rune: string;
   amount: string;
-  txid: string;
   price: string;
   type: 'ask' | 'bid';
-  status: 'pending' | 'confirming' | 'confirmed' | 'errored';
+  status: 'pending' | 'completed' | 'failed';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UserSettings {
+  bitcoinPrivateKey?: string;
+  ordUrl: string;
+  nostrRelays: string[];
+  nostrPrivateKey: string;
+  nostrPublicKey?: string; // Derived from private key, read-only
 }
 
 // API Response Types

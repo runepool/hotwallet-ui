@@ -1,4 +1,4 @@
-import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction } from '../types/api';
+import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings } from '../types/api';
 
 export interface ApiClient {
   createOrder(order: CreateRuneOrderDto): Promise<void>;
@@ -7,10 +7,8 @@ export interface ApiClient {
   createBatchOrders(orders: CreateBatchRuneOrderDto): Promise<void>;
   getTokenBalances(): Promise<TokenBalance[]>;
   getTransactions(): Promise<Transaction[]>;
-  getPendingTransactions(): Promise<Transaction[]>;
-  getPendingTransactionById(id: string): Promise<Transaction>;
-  deletePendingTransaction(id: string): Promise<void>;
-  deleteOrder(orderId: string): Promise<void>;
+  getSettings(): Promise<UserSettings>;
+  updateSettings(settings: UserSettings): Promise<void>;
 }
 
 export class HttpApiClient implements ApiClient {
@@ -62,29 +60,18 @@ export class HttpApiClient implements ApiClient {
     return response.json();
   }
 
-  async getPendingTransactions(): Promise<Transaction[]> {
-    const response = await fetch(`${this.baseUrl}/pending-transactions`);
-    if (!response.ok) throw new Error('Failed to fetch pending transactions');
+  async getSettings(): Promise<UserSettings> {
+    const response = await fetch(`${this.baseUrl}/settings`);
+    if (!response.ok) throw new Error('Failed to fetch settings');
     return response.json();
   }
 
-  async getPendingTransactionById(id: string): Promise<Transaction> {
-    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch pending transaction');
-    return response.json();
-  }
-
-  async deletePendingTransaction(id: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`, {
-      method: 'DELETE',
+  async updateSettings(settings: UserSettings): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
     });
-    if (!response.ok) throw new Error('Failed to delete pending transaction');
-  }
-
-  async deleteOrder(orderId: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/orders/${orderId}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete order');
+    if (!response.ok) throw new Error('Failed to update settings');
   }
 }

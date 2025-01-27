@@ -3,7 +3,6 @@ import { AlertCircle, ArrowUpDown, ArrowUpCircle, ArrowDownCircle, Search, Trash
 import { useOrders } from '../context/OrderContext';
 import { RuneOrder, TokenBalance } from '../types/api';
 import { AVAILABLE_TOKENS } from '../constants/runes';
-import { db } from '../services/db';
 import { getTokenBalances, deleteOrder } from '../api/orders';
 
 interface OrderTableProps {
