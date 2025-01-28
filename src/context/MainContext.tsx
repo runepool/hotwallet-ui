@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { RuneOrder, TokenBalance } from '../types/api';
 import { getOrders, getTokenBalances } from '../api/orders';
 import { AVAILABLE_TOKENS } from '../constants/runes';
@@ -21,6 +21,14 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [isFetchingBalances, setIsFetchingBalances] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshOrders();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const refreshOrders = useCallback(async () => {
     setLoading(true);
