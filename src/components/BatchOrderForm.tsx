@@ -3,7 +3,7 @@ import { createOrder } from '../api/orders';
 import { CreateRuneOrderDto } from '../types/api';
 import { AlertCircle, Plus, ArrowUpDown, Coins, Hash, Search } from 'lucide-react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
-import { useOrders } from '../context/OrderContext';
+import { useMain } from '../context/MainContext';
 
 export function BatchOrderForm() {
   const [loading, setLoading] = useState(false);
@@ -11,7 +11,7 @@ export function BatchOrderForm() {
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [tokenSearch, setTokenSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { addOrder } = useOrders();
+  const { addOrder } = useMain();
   const [currentOrder, setCurrentOrder] = useState<CreateRuneOrderDto>({
     rune: AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')!.name || '',
     quantity: '',

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { AlertCircle, ArrowUpDown, ArrowUpCircle, ArrowDownCircle, Search, Trash2 } from 'lucide-react';
-import { useOrders } from '../context/OrderContext';
+import { useMain } from '../context/MainContext';
 import { RuneOrder, TokenBalance } from '../types/api';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { getTokenBalances, deleteOrder } from '../api/orders';
@@ -81,7 +81,7 @@ function OrderTable({ orders, title, type, balances, searchTerm, onDeleteOrder }
               const filledAmount = order.filledQuantity! / 10 ** token!.decimals || 0;
               const sufficient = hasEnoughBalance(order);
               const progress = (filledAmount / parseInt(order.quantity)) * 100 * 10 ** token!.decimals;
-              
+
               return (
                 <tr
                   key={index}
@@ -143,8 +143,7 @@ function OrderTable({ orders, title, type, balances, searchTerm, onDeleteOrder }
 }
 
 export function OrderList() {
-  const { orders, refreshOrders } = useOrders();
-  const [balances, setBalances] = useState<TokenBalance[]>([]);
+  const { orders, refreshOrders, balances, fetchBalances } = useMain();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -162,22 +161,8 @@ export function OrderList() {
   };
 
   useEffect(() => {
-    refreshOrders();
-
-    const fetchBalances = async () => {
-      try {
-        const data = await getTokenBalances();
-        setBalances(data);
-      } catch (error) {
-        console.error('Failed to fetch balances:', error);
-      }
-    };
-
     fetchBalances();
-
-    const interval = setInterval(fetchBalances, 5000);
-    return () => clearInterval(interval);
-  }, [refreshOrders]);
+  }, [orders]);
 
   if (loading) {
     return (

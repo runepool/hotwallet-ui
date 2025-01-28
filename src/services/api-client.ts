@@ -9,11 +9,16 @@ export interface ApiClient {
   getTransactions(): Promise<Transaction[]>;
   getSettings(): Promise<UserSettings>;
   updateSettings(settings: UserSettings): Promise<void>;
+  getPendingTransactions(): Promise<Transaction[]>;
+  getPendingTransactionById(id: string): Promise<Transaction>;
+  deletePendingTransaction(id: string): Promise<void>;
+  deleteOrder(orderId: string): Promise<void>;
+
 }
 
 export class HttpApiClient implements ApiClient {
   private baseUrl: string;
-
+  
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
@@ -73,5 +78,32 @@ export class HttpApiClient implements ApiClient {
       body: JSON.stringify(settings),
     });
     if (!response.ok) throw new Error('Failed to update settings');
+  }
+
+
+  async getPendingTransactions(): Promise<Transaction[]> {
+    const response = await fetch(`${this.baseUrl}/pending-transactions`);
+    if (!response.ok) throw new Error('Failed to fetch pending transactions');
+    return response.json();
+  }
+
+  async getPendingTransactionById(id: string): Promise<Transaction> {
+    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch pending transaction');
+    return response.json();
+  }
+
+  async deletePendingTransaction(id: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete pending transaction');
+  }
+
+  async deleteOrder(orderId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/orders/${orderId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete order');
   }
 }
