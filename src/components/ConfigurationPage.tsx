@@ -143,154 +143,163 @@ export function ConfigurationPage({ autoGenerateNostr = false, onClose }: Config
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Settings className="w-6 h-6 text-gray-700" />
-        <h2 className="text-2xl font-bold text-gray-900">Configuration</h2>
+    <div className="bg-white rounded-lg shadow-md">
+      <div className="flex items-center justify-between p-4 border-b">
+        <h2 className="text-lg font-semibold text-gray-900">Configuration</h2>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
+      
+      <div className="p-4">
+        {error && (
+          <div className="mb-4 px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4" />
+            <span>{error}</span>
+          </div>
+        )}
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-md flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+        {saved && (
+          <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-md flex items-center gap-2">
+            <Save className="w-5 h-5 flex-shrink-0" />
+            <span>Configuration saved successfully!</span>
+          </div>
+        )}
 
-      {saved && (
-        <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-md flex items-center gap-2">
-          <Save className="w-5 h-5 flex-shrink-0" />
-          <span>Configuration saved successfully!</span>
-        </div>
-      )}
-
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            <div className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              Bitcoin Private Key
-            </div>
-          </label>
-          <input
-            type="text"
-            value={maskedBitcoinKey}
-            onChange={(e) => setConfig(prev => ({ ...prev, bitcoinPrivateKey: e.target.value }))}
-            placeholder="Enter your Bitcoin private key"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            Your Bitcoin private key is stored locally
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            <div className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              Nostr Private Key
-            </div>
-          </label>
-          <div className="flex gap-2">
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                Bitcoin Private Key
+              </div>
+            </label>
             <input
               type="text"
-              value={maskedNostrKey}
-              readOnly
-              placeholder="Enter your Nostr private key"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              value={maskedBitcoinKey}
+              onChange={(e) => setConfig(prev => ({ ...prev, bitcoinPrivateKey: e.target.value }))}
+              placeholder="Enter your Bitcoin private key"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
             />
-            <button
-              onClick={generateNostrKey}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center gap-2"
-              title="Generate new key"
-            >
-              <RefreshCw className="w-5 h-5" />
-              Generate
-            </button>
+            <p className="mt-1 text-sm text-gray-500">
+              Your Bitcoin private key is stored locally
+            </p>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            {showGeneratedKey ? 'Click Save to store the key locally' : 'Your Nostr private key is stored locally'}
-          </p>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            <div className="flex items-center gap-2">
-              <Link className="w-4 h-4" />
-              ORD URL
-            </div>
-          </label>
-          <input
-            type="url"
-            value={config.ordUrl}
-            onChange={(e) => setConfig(prev => ({ ...prev, ordUrl: e.target.value }))}
-            placeholder="https://ord.runepool.io"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            <div className="flex items-center gap-2">
-              <Radio className="w-4 h-4" />
-              Nostr Relays
-            </div>
-          </label>
-
-          <div className="space-y-2">
-            {config.nostrRelays.map((relay, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={relay}
-                  onChange={(e) => {
-                    const updatedRelays = [...config.nostrRelays];
-                    updatedRelays[index] = e.target.value;
-                    setConfig(prev => ({ ...prev, nostrRelays: updatedRelays }));
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <button
-                  onClick={() => removeRelay(index)}
-                  className="p-2 text-red-600 hover:text-red-700 focus:outline-none"
-                  title="Remove relay"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                Nostr Private Key
               </div>
-            ))}
-
-            <div className="flex items-center gap-2">
+            </label>
+            <div className="flex gap-2">
               <input
                 type="text"
-                value={newRelay}
-                onChange={(e) => setNewRelay(e.target.value)}
-                placeholder="wss://relay.example.com"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newRelay) {
-                    e.preventDefault();
-                    addRelay();
-                  }
-                }}
+                value={maskedNostrKey}
+                readOnly
+                placeholder="Enter your Nostr private key"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
               />
               <button
-                onClick={addRelay}
-                className="p-2 text-blue-600 hover:text-blue-700 focus:outline-none"
-                title="Add relay"
+                onClick={generateNostrKey}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center gap-2"
+                title="Generate new key"
               >
-                <Plus className="w-5 h-5" />
+                <RefreshCw className="w-5 h-5" />
+                Generate
               </button>
             </div>
+            <p className="mt-1 text-sm text-gray-500">
+              {showGeneratedKey ? 'Click Save to store the key locally' : 'Your Nostr private key is stored locally'}
+            </p>
           </div>
-        </div>
 
-        <button
-          onClick={handleSave}
-          className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-2"
-        >
-          <Save className="w-5 h-5" />
-          Save Configuration
-        </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex items-center gap-2">
+                <Link className="w-4 h-4" />
+                ORD URL
+              </div>
+            </label>
+            <input
+              type="url"
+              value={config.ordUrl}
+              onChange={(e) => setConfig(prev => ({ ...prev, ordUrl: e.target.value }))}
+              placeholder="https://ord.runepool.io"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4" />
+                Nostr Relays
+              </div>
+            </label>
+
+            <div className="space-y-2">
+              {config.nostrRelays.map((relay, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={relay}
+                    onChange={(e) => {
+                      const updatedRelays = [...config.nostrRelays];
+                      updatedRelays[index] = e.target.value;
+                      setConfig(prev => ({ ...prev, nostrRelays: updatedRelays }));
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={() => removeRelay(index)}
+                    className="p-2 text-red-600 hover:text-red-700 focus:outline-none"
+                    title="Remove relay"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newRelay}
+                  onChange={(e) => setNewRelay(e.target.value)}
+                  placeholder="wss://relay.example.com"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newRelay) {
+                      e.preventDefault();
+                      addRelay();
+                    }
+                  }}
+                />
+                <button
+                  onClick={addRelay}
+                  className="p-2 text-blue-600 hover:text-blue-700 focus:outline-none"
+                  title="Add relay"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSave}
+            className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-2"
+          >
+            <Save className="w-5 h-5" />
+            Save Configuration
+          </button>
+        </div>
       </div>
     </div>
   );
