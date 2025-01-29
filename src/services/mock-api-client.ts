@@ -1,5 +1,5 @@
 import { ApiClient } from './api-client';
-import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction } from '../types/api';
+import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, TransactionStatus } from '../types/api';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 
 export class MockApiClient implements ApiClient {
@@ -10,7 +10,7 @@ export class MockApiClient implements ApiClient {
       quantity: '1000',
       price: '100',
       type: 'ask',
-      filledAmount: 400,
+      filledQuantity: '400',
       createdAt: new Date().toISOString()
     },
     {
@@ -19,7 +19,7 @@ export class MockApiClient implements ApiClient {
       quantity: '500',
       price: '200',
       type: 'bid',
-      filledAmount: 250,
+      filledQuantity: '250',
       createdAt: new Date().toISOString()
     }
   ];
@@ -31,8 +31,9 @@ export class MockApiClient implements ApiClient {
       rune: 'DOG',
       amount: '100',
       price: '100',
-      type: 'ask',
-      status: 'pending',
+      type: 'sell',
+      status: TransactionStatus.CONFIRMING,
+      txid: '123abc',
       createdAt: new Date(Date.now() - 120000).toISOString(), // 2 minutes ago
       updatedAt: new Date(Date.now() - 60000).toISOString()
     },
@@ -42,8 +43,9 @@ export class MockApiClient implements ApiClient {
       rune: 'LIQUIDIUM',
       amount: '50',
       price: '200',
-      type: 'bid',
-      status: 'pending',
+      type: 'buy',
+      status: TransactionStatus.CONFIRMED,
+      txid: '456def',
       createdAt: new Date(Date.now() - 60000).toISOString(), // 1 minute ago
       updatedAt: new Date(Date.now() - 30000).toISOString()
     }
@@ -61,7 +63,7 @@ export class MockApiClient implements ApiClient {
     const newOrder = {
       ...order,
       id: (this.orders.length + 1).toString(),
-      filledAmount: 0,
+      filledQuantity: '0',
       createdAt: new Date().toISOString()
     };
     this.orders.push(newOrder);
@@ -69,7 +71,7 @@ export class MockApiClient implements ApiClient {
 
   async getOrders(): Promise<RuneOrder[]> {
     await this.delay(500);
-    this.updateFilledAmounts();
+    this.updatefilledQuantitys();
     return [...this.orders];
   }
 
@@ -100,19 +102,19 @@ export class MockApiClient implements ApiClient {
 
   async getPendingTransactions(): Promise<Transaction[]> {
     await this.delay(500);
-    return this.transactions.filter(tx => tx.status === 'pending');
+    return this.transactions.filter(tx => tx.status === TransactionStatus.CONFIRMING);
   }
 
   async getPendingTransactionById(id: string): Promise<Transaction> {
     await this.delay(500);
-    const transaction = this.transactions.find(tx => tx.id === id && tx.status === 'pending');
+    const transaction = this.transactions.find(tx => tx.id === id && tx.status === TransactionStatus.CONFIRMING);
     if (!transaction) throw new Error('Pending transaction not found');
     return transaction;
   }
 
   async deletePendingTransaction(id: string): Promise<void> {
     await this.delay(500);
-    const index = this.transactions.findIndex(tx => tx.id === id && tx.status === 'pending');
+    const index = this.transactions.findIndex(tx => tx.id === id && tx.status === TransactionStatus.CONFIRMING);
     if (index !== -1) {
       this.transactions.splice(index, 1);
     }
@@ -122,13 +124,10 @@ export class MockApiClient implements ApiClient {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private updateFilledAmounts(): void {
+  private updatefilledQuantitys(): void {
     this.orders = this.orders.map(order => ({
       ...order,
-      filledAmount: Math.min(
-        (order.filledAmount || 0) + Math.floor(Math.random() * 10),
-        parseInt(order.quantity)
-      )
+      filledQuantity: (parseInt(order.filledQuantity || '0') + Math.floor(Math.random() * 10)).toString(),
     }));
   }
 
@@ -151,10 +150,10 @@ export class MockApiClient implements ApiClient {
   private updateTransactions(): void {
     // Randomly update transaction statuses
     this.transactions = this.transactions.map(tx => {
-      if (tx.status === 'pending' && Math.random() < 0.2) {
+      if (tx.status === TransactionStatus.CONFIRMING && Math.random() < 0.2) {
         return {
           ...tx,
-          status: Math.random() < 0.9 ? 'completed' : 'failed',
+          status: Math.random() < 0.9 ? TransactionStatus.CONFIRMED : TransactionStatus.FAILED,
           updatedAt: new Date().toISOString()
         };
       }
@@ -171,8 +170,9 @@ export class MockApiClient implements ApiClient {
           rune: order.rune,
           amount,
           price: order.price,
-          type: order.type,
-          status: 'pending',
+          type: order.type === 'ask' ? 'sell' : 'buy',
+          status: TransactionStatus.CONFIRMING,
+          txid: `txid${this.transactions.length + 1}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };

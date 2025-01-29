@@ -9,7 +9,7 @@ class InMemoryDB {
       quantity: '1000',
       price: '100',
       type: 'ask',
-      filledAmount: 400,
+      filledQuantity: 400,
       createdAt: new Date().toISOString()
     },
     {
@@ -18,7 +18,7 @@ class InMemoryDB {
       quantity: '500',
       price: '200',
       type: 'bid',
-      filledAmount: 250,
+      filledQuantity: 250,
       createdAt: new Date().toISOString()
     }
   ];
@@ -35,7 +35,7 @@ class InMemoryDB {
         const newOrder = {
           ...order,
           id: (this.orders.length + 1).toString(),
-          filledAmount: 0,
+          filledQuantity: 0,
           createdAt: new Date().toISOString()
         };
         this.orders.push(newOrder);
@@ -50,8 +50,8 @@ class InMemoryDB {
         // Update filled amounts periodically
         this.orders = this.orders.map(order => ({
           ...order,
-          filledAmount: Math.min(
-            (order.filledAmount || 0) + Math.floor(Math.random() * 10),
+          filledQuantity: Math.min(
+            (order.filledQuantity || 0) + Math.floor(Math.random() * 10),
             parseInt(order.quantity)
           )
         }));

@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { RuneOrder, TokenBalance } from '../types/api';
-import { getOrders, getTokenBalances } from '../api/orders';
+import { getOrders, getTokenBalances, deleteOrder as apiDeleteOrder } from '../api/orders';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 
 interface MainContextType {
   orders: RuneOrder[];
   refreshOrders: () => Promise<void>;
   addOrder: (order: RuneOrder) => void;
+  deleteOrder: (orderId: string) => Promise<void>;
   loading: boolean;
   balances: TokenBalance[];
   fetchBalances: () => Promise<void>;
@@ -26,7 +27,7 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(() => {
       refreshOrders();
     }, 5000);
-
+    refreshOrders();
     return () => clearInterval(interval);
   }, []);
 
@@ -78,11 +79,22 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     setOrders(prevOrders => [...prevOrders, order]);
   }, []);
 
+  const deleteOrder = useCallback(async (orderId: string) => {
+    try {
+      await apiDeleteOrder(orderId);
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+    } catch (error) {
+      console.error('Failed to delete order:', error);
+      throw error;
+    }
+  }, []);
+
   return (
     <MainContext.Provider value={{
       orders,
       refreshOrders,
       addOrder,
+      deleteOrder,
       loading,
       balances,
       fetchBalances,

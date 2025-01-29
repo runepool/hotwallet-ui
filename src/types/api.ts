@@ -1,12 +1,12 @@
 // API Types
 export interface RuneOrder {
-  id?: string;
+  id: string;
   rune: string;
   quantity: string;
   price: string;
   type: 'ask' | 'bid';
-  filledQuantity?: number;
-  createdAt?: string;
+  filledQuantity: string;
+  createdAt: string;
 }
 
 export interface CreateRuneOrderDto {
@@ -27,14 +27,22 @@ export interface TokenBalance {
   decimals: number;
 }
 
+export enum TransactionStatus {
+  PENDING = 'pending',
+  CONFIRMING = 'confirming',
+  CONFIRMED = 'confirmed',
+  ERRORED = 'errored'
+}
+
 export interface Transaction {
   id: string;
   orderId: string;
   rune: string;
   amount: string;
   price: string;
-  type: 'ask' | 'bid';
-  status: 'pending' | 'completed' | 'failed';
+  type: 'buy' | 'sell';
+  status: TransactionStatus;
+  txid: string;
   createdAt: string;
   updatedAt: string;
 }

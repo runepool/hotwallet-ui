@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { OrderList } from './components/OrderList';
 import { BatchOrderForm } from './components/BatchOrderForm';
-import { TransactionList } from './components/TransactionList';
 import { ConfigurationPage } from './components/ConfigurationPage';
 import { AlertCircle } from 'lucide-react';
 import { MainProvider, useMain } from './context/MainContext';
@@ -88,9 +87,8 @@ function AppContent() {
             />
           ) : (
             <>
-              <BatchOrderForm />
+              <BatchOrderForm balances={balances} />
               <OrderList />
-              <TransactionList />
             </>
           )}
         </div>
