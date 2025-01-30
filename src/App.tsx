@@ -7,12 +7,35 @@ import { MainProvider, useMain } from './context/MainContext';
 import { getPublicKey } from './utils/nostr';
 import { Header } from './components/Header';
 import { getApiClient } from './services/api-provider';
+import { WarningType } from './types/api';
+import { X } from 'lucide-react';
+
+function getWarningColor(type: WarningType): string {
+  switch (type) {
+    case WarningType.LOW_LIQUIDITY:
+      return 'bg-yellow-100 border-yellow-400 text-yellow-800';
+    case WarningType.NETWORK_ERROR:
+    case WarningType.ORDER_ERROR:
+    case WarningType.BALANCE_ERROR:
+      return 'bg-red-100 border-red-400 text-red-800';
+    default:
+      return 'bg-gray-100 border-gray-400 text-gray-800';
+  }
+}
 
 function AppContent() {
   const [showConfig, setShowConfig] = useState(false);
   const [hasKeys, setHasKeys] = useState(false);
   const [nostrPublicKey, setNostrPublicKey] = useState<string | null>(null);
-  const { balances, fetchBalances, error } = useMain();
+  const { 
+    orders, 
+    balances, 
+    loading, 
+    error, 
+    refreshBalances, 
+    warnings,
+    clearWarning
+  } = useMain();
 
   const checkKeys = useMemo(() => async () => {
     try {
@@ -50,13 +73,13 @@ function AppContent() {
 
   useEffect(() => {
     if (!hasKeys) return;
-    fetchBalances();
-  }, [hasKeys]);
+    refreshBalances();
+  }, [hasKeys, refreshBalances]);
 
   const handleCloseConfig = () => {
     setShowConfig(false);
     checkKeys();
-    fetchBalances();
+    refreshBalances();
   };
 
   return (
@@ -68,6 +91,27 @@ function AppContent() {
         showConfig={showConfig}
         setShowConfig={setShowConfig}
       />
+
+      {/* Warnings */}
+      {warnings.filter(w => w.type !== 'LOW_LIQUIDITY').length > 0 && (
+        <div className="mb-4 space-y-2">
+          {warnings.filter(w => w.type !== 'LOW_LIQUIDITY').map((warning) => (
+            <div
+              key={warning.id}
+              className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3"
+            >
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1 text-sm text-red-700">{warning.message}</div>
+              <button
+                onClick={() => clearWarning(warning.id)}
+                className="shrink-0 text-red-500 hover:text-red-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

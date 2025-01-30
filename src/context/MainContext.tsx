@@ -1,17 +1,23 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { RuneOrder, TokenBalance } from '../types/api';
+import { RuneOrder, TokenBalance, OutputsHealth, AppWarning, WarningType } from '../types/api';
 import { getOrders, getTokenBalances, deleteOrder as apiDeleteOrder } from '../api/orders';
 import { AVAILABLE_TOKENS } from '../constants/runes';
+import { getApiClient } from '../services/api-provider';
 
 interface MainContextType {
   orders: RuneOrder[];
-  refreshOrders: () => Promise<void>;
-  addOrder: (order: RuneOrder) => void;
-  deleteOrder: (orderId: string) => Promise<void>;
-  loading: boolean;
   balances: TokenBalance[];
-  fetchBalances: () => Promise<void>;
+  loading: boolean;
+  isFetchingBalances: boolean;
   error: string | null;
+  deleteOrder: (orderId: string) => Promise<void>;
+  refreshOrders: () => Promise<void>;
+  refreshBalances: () => Promise<void>;
+  outputsHealth: OutputsHealth | null;
+  refreshHealth: () => Promise<void>;
+  warnings: AppWarning[];
+  clearWarning: (id: string) => void;
+  clearWarningsByType: (type: WarningType) => void;
 }
 
 const MainContext = createContext<MainContextType | undefined>(undefined);
@@ -22,12 +28,37 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [isFetchingBalances, setIsFetchingBalances] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outputsHealth, setOutputsHealth] = useState<OutputsHealth | null>(null);
+  const [warnings, setWarnings] = useState<AppWarning[]>([]);
+
+  const addWarning = useCallback((type: WarningType, message: string, data?: any) => {
+    const warning: AppWarning = {
+      id: Math.random().toString(36).substring(7),
+      type,
+      message,
+      data,
+      timestamp: Date.now()
+    };
+    setWarnings(prev => [...prev, warning]);
+  }, []);
+
+  const clearWarning = useCallback((id: string) => {
+    setWarnings(prev => prev.filter(w => w.id !== id));
+  }, []);
+
+  const clearWarningsByType = useCallback((type: WarningType) => {
+    setWarnings(prev => prev.filter(w => w.type !== type));
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
       refreshOrders();
+      refreshBalances();
+      refreshHealth();
     }, 5000);
     refreshOrders();
+    refreshBalances();
+    refreshHealth();
     return () => clearInterval(interval);
   }, []);
 
@@ -36,20 +67,23 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     try {
       const newOrders = await getOrders();
       setOrders(newOrders);
+      clearWarningsByType(WarningType.ORDER_ERROR);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
-      setError('Unable to connect to server. Please ensure the API is running at http://localhost:3000');
+      addWarning(
+        WarningType.ORDER_ERROR,
+        'Unable to connect to server. Please ensure the API is running.'
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchBalances = useCallback(async () => {
+  const refreshBalances = useCallback(async () => {
     if (isFetchingBalances) return;
 
     try {
       setIsFetchingBalances(true);
-
       const data = await getTokenBalances();
       const scaledBalances = data
         .map(balance => {
@@ -66,40 +100,76 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
         .filter((balance): balance is TokenBalance => balance !== null);
 
       setBalances(scaledBalances);
-      setError(null);
+      clearWarningsByType(WarningType.BALANCE_ERROR);
     } catch (err) {
-      setError('Unable to connect to server. Please ensure the API is running at http://localhost:3000');
+      addWarning(
+        WarningType.BALANCE_ERROR,
+        'Unable to connect to server. Please ensure the API is running.'
+      );
       console.error('Failed to fetch balances:', err);
     } finally {
       setIsFetchingBalances(false);
     }
   }, [isFetchingBalances]);
 
-  const addOrder = useCallback((order: RuneOrder) => {
-    setOrders(prevOrders => [...prevOrders, order]);
+  const refreshHealth = useCallback(async () => {
+    try {
+      const health = await getApiClient().getLiquidityHealth();
+      setOutputsHealth(health);
+
+      // Clear existing liquidity warnings before checking again
+      clearWarningsByType(WarningType.LOW_LIQUIDITY);
+
+      // Check health for each balance and add warnings
+      for (const [token, outputs] of Object.entries(health)) {
+        if (outputs.length < 5) {
+          addWarning(
+            WarningType.LOW_LIQUIDITY,
+            `Low liquidity for ${token}: only ${outputs.length} UTXOs available. Recommended minimum is 5 UTXOs.`,
+            { token, outputCount: outputs.length }
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch liquidity health:', error);
+      addWarning(
+        WarningType.NETWORK_ERROR,
+        'Failed to fetch liquidity health information.'
+      );
+    }
   }, []);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     try {
       await apiDeleteOrder(orderId);
-      setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+      await refreshOrders();
     } catch (error) {
       console.error('Failed to delete order:', error);
-      throw error;
+      addWarning(
+        WarningType.ORDER_ERROR,
+        `Failed to delete order ${orderId}`
+      );
     }
-  }, []);
+  }, [refreshOrders]);
+
+  const value = {
+    orders,
+    balances,
+    loading,
+    isFetchingBalances,
+    error,
+    deleteOrder,
+    refreshOrders,
+    refreshBalances,
+    outputsHealth,
+    refreshHealth,
+    warnings,
+    clearWarning,
+    clearWarningsByType
+  };
 
   return (
-    <MainContext.Provider value={{
-      orders,
-      refreshOrders,
-      addOrder,
-      deleteOrder,
-      loading,
-      balances,
-      fetchBalances,
-      error
-    }}>
+    <MainContext.Provider value={value}>
       {children}
     </MainContext.Provider>
   );

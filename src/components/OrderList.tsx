@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { AlertCircle, ArrowUpDown, ArrowUpCircle, ArrowDownCircle, Search, Trash2, X, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, ArrowUpDown, ArrowUpCircle, ArrowDownCircle, Search, Trash2, X } from 'lucide-react';
 import { useMain } from '../context/MainContext';
-import { RuneOrder, TokenBalance } from '../types/api';
+import { RuneOrder } from '../types/api';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { deleteOrder } from '../api/orders';
 import { TransactionList } from './TransactionList';
+import { LiquidityList } from './LiquidityList';
 
 interface OrderTableProps {
   orders: RuneOrder[];
@@ -15,8 +16,13 @@ interface OrderTableProps {
 }
 
 function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTableProps) {
+  const { balances } = useMain();
+
   const hasEnoughBalance = (order: RuneOrder) => {
-    return true;
+    if (type === 'bid') return true;
+    const balance = balances.find(b => b.token === order.rune);
+    if (!balance) return false;
+    return +balance.amount >= +order.quantity;
   };
 
   const formatQuantity = (order: RuneOrder) => {
@@ -31,6 +37,7 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
         <h3 className="text-sm font-medium text-gray-900">{title}</h3>
         <span className="text-xs text-gray-500">{orders.length} orders</span>
       </div>
+
       <div className="overflow-auto flex-1">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
@@ -99,8 +106,8 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
 
 export function OrderList() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeView, setActiveView] = useState<'orders' | 'transactions'>('orders');
-  const { orders, deleteOrder, refreshOrders } = useMain();
+  const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
+  const { orders, deleteOrder, refreshOrders, warnings } = useMain();
   const [loading, setLoading] = useState(false);
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -134,27 +141,47 @@ export function OrderList() {
     .filter(order => order.type === 'bid')
     .sort((a, b) => +b.price - +a.price); // descending
 
+  const hasLiquidityWarnings = warnings.some(w => w.type === 'LOW_LIQUIDITY');
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
           <button
             onClick={() => setActiveView('orders')}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeView === 'orders'
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeView === 'orders'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-              }`}
+            }`}
           >
             Orders
           </button>
           <button
             onClick={() => setActiveView('transactions')}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeView === 'transactions'
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeView === 'transactions'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-              }`}
+            }`}
           >
             Transactions
+          </button>
+          <button
+            onClick={() => setActiveView('liquidity')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all relative ${
+              activeView === 'liquidity'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Liquidity
+            {hasLiquidityWarnings && (
+              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+            )}
           </button>
         </div>
 
@@ -172,7 +199,7 @@ export function OrderList() {
         </div>
       </div>
 
-      {activeView === 'orders' ? (
+      {activeView === 'orders' && (
         <div className="grid grid-cols-2 gap-4">
           <OrderTable
             orders={askOrders}
@@ -189,9 +216,9 @@ export function OrderList() {
             onDeleteOrder={handleDeleteOrder}
           />
         </div>
-      ) : (
-        <TransactionList searchTerm={searchTerm} />
       )}
+      {activeView === 'transactions' && <TransactionList searchTerm={searchTerm} />}
+      {activeView === 'liquidity' && <LiquidityList />}
     </div>
   );
 }

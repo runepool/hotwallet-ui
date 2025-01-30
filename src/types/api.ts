@@ -55,6 +55,43 @@ export interface UserSettings {
   nostrPublicKey?: string; // Derived from private key, read-only
 }
 
+export type OutputHealth = {
+  location: string;
+  value?: number;
+  script_pubkey?: string;
+  address?: string;
+  transaction?: string;
+  sat_ranges?: number[][];
+  inscriptions?: string[];
+  runes?: Record<string, { amount: number }>;
+  amount?: number;
+};
+
+export type OutputsHealth = {
+  [key: string]: OutputHealth[];
+};
+
+export interface SplitAssetRequest {
+  asset_name: string;    // Name of the asset to split
+  splits: number;        // Number of splits to create (min: 1)
+  amount_per_split: number; // Amount per split (min: 1)
+}
+
+export enum WarningType {
+  LOW_LIQUIDITY = 'LOW_LIQUIDITY',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  BALANCE_ERROR = 'BALANCE_ERROR',
+  ORDER_ERROR = 'ORDER_ERROR'
+}
+
+export interface AppWarning {
+  id: string;
+  type: WarningType;
+  message: string;
+  data?: any;
+  timestamp: number;
+}
+
 // API Response Types
 export interface ApiResponse<T> {
   data?: T;

@@ -1,4 +1,4 @@
-import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings } from '../types/api';
+import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest } from '../types/api';
 
 export interface ApiClient {
   createOrder(order: CreateRuneOrderDto): Promise<void>;
@@ -13,7 +13,8 @@ export interface ApiClient {
   getPendingTransactionById(id: string): Promise<Transaction>;
   deletePendingTransaction(id: string): Promise<void>;
   deleteOrder(orderId: string): Promise<void>;
-
+  getLiquidityHealth(): Promise<OutputsHealth>;
+  splitAsset(request: SplitAssetRequest): Promise<void>;
 }
 
 export class HttpApiClient implements ApiClient {
@@ -80,7 +81,6 @@ export class HttpApiClient implements ApiClient {
     if (!response.ok) throw new Error('Failed to update settings');
   }
 
-
   async getPendingTransactions(): Promise<Transaction[]> {
     const response = await fetch(`${this.baseUrl}/pending-transactions`);
     if (!response.ok) throw new Error('Failed to fetch pending transactions');
@@ -105,5 +105,34 @@ export class HttpApiClient implements ApiClient {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('Failed to delete order');
+  }
+
+  async getLiquidityHealth(): Promise<OutputsHealth> {
+    const response = await fetch(`${this.baseUrl}/account/liquidity-health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get liquidity health: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async splitAsset(request: SplitAssetRequest): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/account/split-asset`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to split asset: ${response.statusText}`);
+    }
   }
 }
