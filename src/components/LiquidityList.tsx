@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useMain } from '../context/MainContext';
-import { ArrowUpDown, Loader2, RotateCw } from 'lucide-react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
+import { SplitUtxoModal } from './SplitUtxoModal';
+import { ArrowUpDown, Loader2, RotateCw } from 'lucide-react';
 
 export function LiquidityList() {
-  const { outputsHealth, apiClient, refreshBalances, balances } = useMain();
+  const { outputsHealth, apiClient, refreshBalances, balances, warnings } = useMain();
   const [processing, setProcessing] = useState<{ [key: string]: boolean }>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const [selectedOutputs, setSelectedOutputs] = useState<any[]>([]);
 
   if (!outputsHealth) {
     return (
@@ -64,6 +67,13 @@ export function LiquidityList() {
     return (tokenA?.symbol || '').localeCompare(tokenB?.symbol || '');
   });
 
+  const handleSplitClick = (asset: string, outputs: any[]) => {
+    const balance = balances.find(b => b.token === asset);
+    console.log('Found balance:', balance); // Debug log
+    setSelectedAsset(asset);
+    setSelectedOutputs(outputs);
+  };
+
   return (
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
       <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
@@ -113,6 +123,9 @@ export function LiquidityList() {
               const balance = balances.find(b => b.token === asset);
               const isProcessing = processing[asset] || false;
               const hasLowLiquidity = outputs.length < 5;
+              const totalBalance = outputs.reduce((sum: number, output: any) => {
+                return sum + (output.amount || 0);
+              }, 0);
               
               return (
                 <tr key={asset}>
@@ -142,7 +155,7 @@ export function LiquidityList() {
                   <td className="px-3 py-1.5 whitespace-nowrap text-right text-sm">
                     {hasLowLiquidity && (
                       <button
-                        onClick={() => handleSplitAsset(asset)}
+                        onClick={() => handleSplitClick(asset, outputs)}
                         disabled={isProcessing}
                         className={`min-w-[80px] px-3 py-1 text-xs font-medium rounded flex items-center justify-center ${
                           isProcessing
@@ -167,6 +180,14 @@ export function LiquidityList() {
           </tbody>
         </table>
       </div>
+
+      <SplitUtxoModal
+        isOpen={!!selectedAsset}
+        onClose={() => setSelectedAsset(null)}
+        asset={selectedAsset || ''}
+        outputs={selectedOutputs}
+        totalBalance={balances.find(b => b.token === selectedAsset)?.balance || 0}
+      />
     </div>
   );
 }
