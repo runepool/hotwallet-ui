@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { RuneOrder, TokenBalance, OutputsHealth, AppWarning, WarningType } from '../types/api';
 import { getOrders, getTokenBalances, deleteOrder as apiDeleteOrder } from '../api/orders';
 import { AVAILABLE_TOKENS } from '../constants/runes';
@@ -18,6 +18,8 @@ interface MainContextType {
   warnings: AppWarning[];
   clearWarning: (id: string) => void;
   clearWarningsByType: (type: WarningType) => void;
+  addOrder: (order: RuneOrder) => Promise<void>;
+  apiClient: ReturnType<typeof getApiClient>;
 }
 
 const MainContext = createContext<MainContextType | undefined>(undefined);
@@ -30,16 +32,30 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [outputsHealth, setOutputsHealth] = useState<OutputsHealth | null>(null);
   const [warnings, setWarnings] = useState<AppWarning[]>([]);
+  const refreshingHealth = useRef(false);
+  const apiClient = getApiClient();
 
   const addWarning = useCallback((type: WarningType, message: string, data?: any) => {
-    const warning: AppWarning = {
-      id: Math.random().toString(36).substring(7),
-      type,
-      message,
-      data,
-      timestamp: Date.now()
-    };
-    setWarnings(prev => [...prev, warning]);
+    setWarnings(prev => {
+      // Check if we already have a similar warning
+      const hasExistingWarning = prev.some(w => 
+        w.type === type && 
+        w.message === message
+      );
+      
+      if (hasExistingWarning) {
+        return prev;
+      }
+
+      const warning: AppWarning = {
+        id: Math.random().toString(36).substring(7),
+        type,
+        message,
+        data,
+        timestamp: Date.now()
+      };
+      return [...prev, warning];
+    });
   }, []);
 
   const clearWarning = useCallback((id: string) => {
@@ -50,16 +66,40 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     setWarnings(prev => prev.filter(w => w.type !== type));
   }, []);
 
+  // Cleanup stale warnings
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshOrders();
-      refreshBalances();
-      refreshHealth();
-    }, 5000);
-    refreshOrders();
-    refreshBalances();
-    refreshHealth();
-    return () => clearInterval(interval);
+    return () => {
+      // Clear all warnings when component unmounts
+      setWarnings([]);
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const pollData = async () => {
+      if (!mounted) return;
+      
+      try {
+        await Promise.all([
+          refreshOrders(),
+          refreshBalances(),
+          refreshHealth()
+        ]);
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    };
+
+    // Initial load
+    pollData();
+
+    // Set up polling
+    const interval = setInterval(pollData, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const refreshOrders = useCallback(async () => {
@@ -113,31 +153,29 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   }, [isFetchingBalances]);
 
   const refreshHealth = useCallback(async () => {
+    // Prevent concurrent refreshes
+    if (refreshingHealth.current) {
+      return;
+    }
+    
+    refreshingHealth.current = true;
     try {
-      const health = await getApiClient().getLiquidityHealth();
+      const health = await apiClient.getLiquidityHealth();
       setOutputsHealth(health);
-
-      // Clear existing liquidity warnings before checking again
-      clearWarningsByType(WarningType.LOW_LIQUIDITY);
-
-      // Check health for each balance and add warnings
-      for (const [token, outputs] of Object.entries(health)) {
-        if (outputs.length < 5) {
-          addWarning(
-            WarningType.LOW_LIQUIDITY,
-            `Low liquidity for ${token}: only ${outputs.length} UTXOs available. Recommended minimum is 5 UTXOs.`,
-            { token, outputCount: outputs.length }
-          );
-        }
+      // Clear network errors only if we successfully got health data
+      if (health) {
+        clearWarningsByType(WarningType.NETWORK_ERROR);
       }
     } catch (error) {
       console.error('Failed to fetch liquidity health:', error);
       addWarning(
         WarningType.NETWORK_ERROR,
-        'Failed to fetch liquidity health information.'
+        'Unable to connect to server. Please ensure the API is running.'
       );
+    } finally {
+      refreshingHealth.current = false;
     }
-  }, []);
+  }, [addWarning, clearWarningsByType]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     try {
@@ -152,6 +190,31 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshOrders]);
 
+  const addOrder = useCallback(async (order: RuneOrder) => {
+    try {
+      const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+      if (!token) {
+        throw new Error('Token not found');
+      }
+
+      await apiClient.createOrder({ 
+        rune: order.rune, 
+        quantity: order.quantity, 
+        price: order.price, 
+        type: order.type 
+      });
+      await refreshOrders();
+      clearWarningsByType(WarningType.ORDER_ERROR);
+    } catch (error) {
+      console.error('Failed to add order:', error);
+      addWarning(
+        WarningType.ORDER_ERROR,
+        'Failed to add order. Please try again.'
+      );
+      throw error;
+    }
+  }, [apiClient, refreshOrders, clearWarningsByType, addWarning]);
+
   const value = {
     orders,
     balances,
@@ -165,7 +228,9 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     refreshHealth,
     warnings,
     clearWarning,
-    clearWarningsByType
+    clearWarningsByType,
+    addOrder,
+    apiClient
   };
 
   return (

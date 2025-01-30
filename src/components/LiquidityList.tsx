@@ -53,7 +53,7 @@ export function LiquidityList() {
 
   // Filter and sort supported assets
   const supportedAssets = [
-    ['btc', outputsHealth['btc'] || []],
+    ['BTC', outputsHealth['BTC'] || []],
     ...Object.entries(outputsHealth)
       .filter(([asset]) => AVAILABLE_TOKENS.some(t => t.name === asset))
   ].sort((a, b) => {
@@ -102,9 +102,9 @@ export function LiquidityList() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
             {supportedAssets.map(([asset, outputs]) => {
-              const token = asset === 'btc' 
+              const token = asset === 'BTC' 
                 ? { 
-                    name: 'btc', 
+                    name: 'Bitcoin', 
                     symbol: 'BTC', 
                     decimals: 8, 
                     icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'

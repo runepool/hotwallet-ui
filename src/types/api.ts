@@ -1,12 +1,12 @@
 // API Types
 export interface RuneOrder {
-  id: string;
+  id?: string;
   rune: string;
   quantity: string;
   price: string;
   type: 'ask' | 'bid';
-  filledQuantity: string;
-  createdAt: string;
+  filledQuantity?: string;
+  createdAt?: string;
 }
 
 export interface CreateRuneOrderDto {

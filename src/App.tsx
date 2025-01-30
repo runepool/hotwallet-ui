@@ -74,7 +74,7 @@ function AppContent() {
   useEffect(() => {
     if (!hasKeys) return;
     refreshBalances();
-  }, [hasKeys, refreshBalances]);
+  }, [hasKeys]);
 
   const handleCloseConfig = () => {
     setShowConfig(false);

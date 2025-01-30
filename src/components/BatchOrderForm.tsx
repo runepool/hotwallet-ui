@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createOrder } from '../api/orders';
 import { CreateRuneOrderDto } from '../types/api';
 import { TokenBalance } from '../types/api';
 import { AVAILABLE_TOKENS } from '../constants/runes';
@@ -43,19 +42,28 @@ export function BatchOrderForm({ balances }: BatchOrderFormProps) {
     setError(null);
 
     try {
-      await createOrder(currentOrder);
-      // Add the order to the context with proper formatting
-      addOrder({
-        id: Date.now().toString(), // Temporary ID until refresh
+      const selectedToken = AVAILABLE_TOKENS.find(t => t.name === currentOrder.rune);
+      if (!selectedToken) {
+        throw new Error('Token not found');
+      }
+
+      await addOrder({
         rune: currentOrder.rune,
-        quantity: (+currentOrder.quantity * 10 ** selectedToken!.decimals).toString(),
+        quantity: currentOrder.quantity,
         price: currentOrder.price,
-        type: currentOrder.type,
-        filledQuantity: 0,
-        createdAt: new Date().toISOString()
+        type: currentOrder.type
+      });
+
+      // Reset form
+      setCurrentOrder({
+        rune: AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')!.name || '',
+        quantity: '',
+        price: '',
+        type: 'ask',
       });
       setError(null);
     } catch (err) {
+      console.error('Failed to create order:', err);
       setError(err instanceof Error ? err.message : 'Failed to create order');
     } finally {
       setLoading(false);
