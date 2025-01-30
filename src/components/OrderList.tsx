@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AlertCircle, ArrowUpDown, ArrowUpCircle, ArrowDownCircle, Search, Trash2, X } from 'lucide-react';
 import { useMain } from '../context/MainContext';
 import { RuneOrder } from '../types/api';
@@ -107,7 +107,7 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
 export function OrderList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
-  const { orders, deleteOrder, refreshOrders, warnings } = useMain();
+  const { orders, deleteOrder, refreshOrders, warnings, outputsHealth } = useMain();
   const [loading, setLoading] = useState(false);
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -141,7 +141,10 @@ export function OrderList() {
     .filter(order => order.type === 'bid')
     .sort((a, b) => +b.price - +a.price); // descending
 
-  const hasLiquidityWarnings = warnings.some(w => w.type === 'LOW_LIQUIDITY');
+  const hasLowLiquidityAssets = useMemo(() => {
+    if (!outputsHealth) return false;
+    return Object.values(outputsHealth).some(outputs => outputs.length < 5);
+  }, [outputsHealth]);
 
   return (
     <div className="space-y-3">
@@ -176,10 +179,10 @@ export function OrderList() {
             }`}
           >
             Liquidity
-            {hasLiquidityWarnings && (
+            {hasLowLiquidityAssets && (
               <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
               </span>
             )}
           </button>

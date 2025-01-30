@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMain } from '../context/MainContext';
 import { X, SplitSquareHorizontal, Loader2, AlertCircle } from 'lucide-react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
@@ -13,6 +13,7 @@ interface SplitUtxoModalProps {
 
 export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }: SplitUtxoModalProps) {
   const [numOutputs, setNumOutputs] = useState(2);
+  const [amountPerSplit, setAmountPerSplit] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { apiClient, refreshHealth } = useMain();
@@ -28,16 +29,17 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
       : AVAILABLE_TOKENS.find(t => t.name === asset);
   }, [asset]);
 
+  useEffect(() => {
+    if (token && totalBalance > 0) {
+      const rawAmount = totalBalance / numOutputs;
+      setAmountPerSplit(+rawAmount.toFixed());
+    }
+  }, [totalBalance, numOutputs, token]);
+
   const balancePerSplit = useMemo(() => {
     if (!token) return '0';
-    console.log('Modal total balance:', totalBalance, typeof totalBalance); // Debug log
-    const balanceNum = typeof totalBalance === 'string' ? parseInt(totalBalance) : totalBalance;
-    console.log('Num outputs:', numOutputs); // Debug log
-    console.log('Token decimals:', token.decimals); // Debug log
-    const result = (balanceNum / numOutputs / (10 ** token.decimals)).toFixed(token.decimals);
-    console.log('Balance per split:', result); // Debug log
-    return result;
-  }, [totalBalance, numOutputs, token]);
+    return (amountPerSplit / (10 ** token.decimals)).toFixed(token.decimals);
+  }, [amountPerSplit, token]);
 
   if (!isOpen || !token) return null;
 
@@ -45,14 +47,27 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
     setError(null);
     try {
       setLoading(true);
-      await apiClient.splitUtxos(asset, numOutputs);
-      await refreshHealth(); // Refresh the health data to show new UTXOs
+      await apiClient.splitAsset({
+        asset_name: asset,
+        splits: numOutputs,
+        amount_per_split: amountPerSplit
+      });
+      await refreshHealth();
       onClose();
     } catch (err) {
       console.error('Failed to split UTXOs:', err);
       setError(err instanceof Error ? err.message : 'Failed to split UTXOs. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNumOutputsChange = (newValue: number) => {
+    const value = Math.max(2, Math.min(100, newValue));
+    setNumOutputs(value);
+    if (token && totalBalance > 0) {
+      const rawAmount = totalBalance / value;
+      setAmountPerSplit(+rawAmount.toFixed());
     }
   };
 
@@ -115,7 +130,7 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
                   min="2"
                   max="100"
                   value={numOutputs}
-                  onChange={(e) => setNumOutputs(parseInt(e.target.value))}
+                  onChange={(e) => handleNumOutputsChange(parseInt(e.target.value))}
                   className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                 />
                 <input 
@@ -126,7 +141,7 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
                     if (!isNaN(val)) {
-                      setNumOutputs(Math.max(2, Math.min(100, val)));
+                      handleNumOutputsChange(val);
                     }
                   }}
                   className="w-16 px-2 py-1 text-center border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500"

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useMain } from '../context/MainContext';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { SplitUtxoModal } from './SplitUtxoModal';
-import { ArrowUpDown, Loader2, RotateCw } from 'lucide-react';
+import { ArrowUpDown, Loader2, RotateCw, SplitSquareHorizontal } from 'lucide-react';
 
 export function LiquidityList() {
   const { outputsHealth, apiClient, refreshBalances, balances, warnings } = useMain();
@@ -67,6 +67,10 @@ export function LiquidityList() {
     return (tokenA?.symbol || '').localeCompare(tokenB?.symbol || '');
   });
 
+  const hasLowLiquidityAssets = useMemo(() => {
+    return supportedAssets.some(([_, outputs]) => outputs.length < 5);
+  }, [supportedAssets]);
+
   const handleSplitClick = (asset: string, outputs: any[]) => {
     const balance = balances.find(b => b.token === asset);
     console.log('Found balance:', balance); // Debug log
@@ -80,6 +84,11 @@ export function LiquidityList() {
         <h3 className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
           <ArrowUpDown className="h-4 w-4" />
           Asset Liquidity
+          {hasLowLiquidityAssets && (
+            <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded-full bg-yellow-100 text-yellow-800">
+              Low UTXOs
+            </span>
+          )}
         </h3>
         <button
           onClick={handleRefresh}
@@ -93,19 +102,19 @@ export function LiquidityList() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="w-1/4 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Asset
               </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="w-1/4 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Balance
               </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="w-1/6 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 UTXOs
               </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="w-1/6 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th scope="col" className="relative px-3 py-2">
+              <th scope="col" className="w-1/6 relative px-3 py-2">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -128,48 +137,54 @@ export function LiquidityList() {
               }, 0);
               
               return (
-                <tr key={asset}>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-sm">
-                    <div className="flex items-center gap-1.5">
-                      <img src={token?.icon} alt={token?.symbol} className="w-4 h-4 rounded-full" />
-                      <span className="font-medium">{token?.symbol}</span>
+                <tr key={asset} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm">
+                    <div className="flex items-center gap-2">
+                      <img src={token?.icon} alt={token?.symbol} className="w-5 h-5 rounded-full" />
+                      <span className="font-medium text-gray-900">{token?.symbol}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">
                     {formatBalance(balance?.balance, token?.decimals || 8)}
                   </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">
                     {outputs.length}
                   </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-sm">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm">
                     {hasLowLiquidity ? (
-                      <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded-full bg-yellow-100 text-yellow-800">
+                      <span className="px-2 py-1 inline-flex text-xs leading-4 font-medium rounded-full bg-yellow-100 text-yellow-800">
                         Low
                       </span>
                     ) : (
-                      <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded-full bg-green-100 text-green-800">
+                      <span className="px-2 py-1 inline-flex text-xs leading-4 font-medium rounded-full bg-green-100 text-green-800">
                         Good
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-right text-sm">
+                  <td className="px-3 py-2 whitespace-nowrap text-right text-sm">
                     {hasLowLiquidity && (
                       <button
                         onClick={() => handleSplitClick(asset, outputs)}
                         disabled={isProcessing}
-                        className={`min-w-[80px] px-3 py-1 text-xs font-medium rounded flex items-center justify-center ${
-                          isProcessing
+                        className={`
+                          min-w-[80px] px-3 py-1 text-xs font-medium rounded-md
+                          flex items-center justify-center gap-1.5 shadow-sm
+                          ${isProcessing
                             ? 'bg-gray-100 text-gray-500'
-                            : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                        }`}
+                            : 'bg-white border border-yellow-200 text-yellow-900 hover:bg-yellow-50 hover:border-yellow-300'
+                          }
+                        `}
                       >
                         {isProcessing ? (
-                          <div className="flex items-center gap-1.5">
+                          <>
                             <Loader2 className="w-3 h-3 animate-spin" />
                             <span>Fixing...</span>
-                          </div>
+                          </>
                         ) : (
-                          'Split UTXOs'
+                          <>
+                            <SplitSquareHorizontal className="w-3 h-3" />
+                            <span>Split UTXOs</span>
+                          </>
                         )}
                       </button>
                     )}
