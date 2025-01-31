@@ -1,15 +1,36 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMain } from '../context/MainContext';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { SplitUtxoModal } from './SplitUtxoModal';
-import { ArrowUpDown, Loader2, RotateCw, SplitSquareHorizontal } from 'lucide-react';
+import { AutoSplitConfigModal } from './AutoSplitConfigModal';
+import { ArrowUpDown, Loader2, RotateCw, SplitSquareHorizontal, Settings, AlertTriangle } from 'lucide-react';
+import { OutputHealth } from '../types/api';
 
 export function LiquidityList() {
-  const { outputsHealth, apiClient, refreshBalances, balances, warnings } = useMain();
+  const { outputsHealth, apiClient, refreshBalances, balances, warnings, addWarning } = useMain();
   const [processing, setProcessing] = useState<{ [key: string]: boolean }>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
-  const [selectedOutputs, setSelectedOutputs] = useState<any[]>([]);
+  const [selectedOutputs, setSelectedOutputs] = useState<OutputHealth[]>([]);
+  const [isAutoSplitModalOpen, setIsAutoSplitModalOpen] = useState(false);
+  const [selectedAutoSplitAsset, setSelectedAutoSplitAsset] = useState<string>('');
+  const [autoSplitConfigs, setAutoSplitConfigs] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const fetchAutoSplitConfigs = async () => {
+      try {
+        const configs = await apiClient.getAllAutoSplitConfigs();
+        const configMap = configs.reduce((acc, config) => ({
+          ...acc,
+          [config.asset_name]: config.enabled
+        }), {});
+        setAutoSplitConfigs(configMap);
+      } catch (error) {
+        console.error('Failed to fetch auto-split configs:', error);
+      }
+    };
+    fetchAutoSplitConfigs();
+  }, [apiClient]);
 
   if (!outputsHealth) {
     return (
@@ -19,16 +40,9 @@ export function LiquidityList() {
     );
   }
 
-  const handleSplitAsset = async (token: string) => {
-    try {
-      setProcessing(prev => ({ ...prev, [token]: true }));
-      await apiClient.splitAsset({ token });
-      await refreshBalances();
-    } catch (error) {
-      console.error('Failed to split asset:', error);
-    } finally {
-      setProcessing(prev => ({ ...prev, [token]: false }));
-    }
+  const handleSplitClick = (asset: string, outputs: OutputHealth[]) => {
+    setSelectedAsset(asset);
+    setSelectedOutputs(outputs);
   };
 
   const handleRefresh = async () => {
@@ -50,33 +64,41 @@ export function LiquidityList() {
         maximumFractionDigits: 8
       });
     } catch (error) {
+      console.error('Error formatting balance:', error);
       return '0.00';
     }
   };
 
+  const handleOpenAutoSplitConfig = (token: string) => {
+    setSelectedAutoSplitAsset(token);
+    setIsAutoSplitModalOpen(true);
+  };
+
   // Filter and sort supported assets
-  const supportedAssets = [
-    ['BTC', outputsHealth['BTC'] || []],
-    ...Object.entries(outputsHealth)
-      .filter(([asset]) => AVAILABLE_TOKENS.some(t => t.name === asset))
-  ].sort((a, b) => {
-    if (a[0] === 'btc') return -1;
-    if (b[0] === 'btc') return 1;
-    const tokenA = AVAILABLE_TOKENS.find(t => t.name === a[0]);
-    const tokenB = AVAILABLE_TOKENS.find(t => t.name === b[0]);
-    return (tokenA?.symbol || '').localeCompare(tokenB?.symbol || '');
-  });
+  const supportedAssets = useMemo(() => {
+    if (!outputsHealth) {
+      console.log('No outputsHealth data');
+      return [];
+    }
+    
+    console.log('OutputsHealth:', outputsHealth);
+    
+    const entries = Object.entries(outputsHealth).filter(([asset]) => 
+      asset === 'BTC' || AVAILABLE_TOKENS.some(t => t.name === asset)
+    );
+
+    console.log('Filtered entries:', entries);
+
+    return entries.sort((a, b) => {
+      if (a[0] === 'BTC') return -1;
+      if (b[0] === 'BTC') return 1;
+      return a[0].localeCompare(b[0]);
+    });
+  }, [outputsHealth]);
 
   const hasLowLiquidityAssets = useMemo(() => {
     return supportedAssets.some(([_, outputs]) => outputs.length < 5);
   }, [supportedAssets]);
-
-  const handleSplitClick = (asset: string, outputs: any[]) => {
-    const balance = balances.find(b => b.token === asset);
-    console.log('Found balance:', balance); // Debug log
-    setSelectedAsset(asset);
-    setSelectedOutputs(outputs);
-  };
 
   return (
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
@@ -98,6 +120,7 @@ export function LiquidityList() {
           <RotateCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
       <div className="border-t border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -120,35 +143,36 @@ export function LiquidityList() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {supportedAssets.map(([asset, outputs]) => {
-              const token = asset === 'BTC' 
+            {supportedAssets.map(([token, outputs]) => {
+              const balance = balances.find(b => b.token === token);
+              const tokenInfo = token === 'BTC' 
                 ? { 
                     name: 'Bitcoin', 
                     symbol: 'BTC', 
                     decimals: 8, 
                     icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'
                   } 
-                : AVAILABLE_TOKENS.find(t => t.name === asset);
-              const balance = balances.find(b => b.token === asset);
-              const isProcessing = processing[asset] || false;
-              const hasLowLiquidity = outputs.length < 5;
-              const totalBalance = outputs.reduce((sum: number, output: any) => {
-                return sum + (output.amount || 0);
-              }, 0);
-              
+                : AVAILABLE_TOKENS.find(t => t.name === token);
+
+              if (!tokenInfo) return null;
+
+              const outputCount = Array.isArray(outputs) ? outputs.length : 0;
+              const hasLowLiquidity = outputCount < 5;
+              const isProcessing = processing[token];
+
               return (
-                <tr key={asset} className="hover:bg-gray-50">
+                <tr key={token} className="hover:bg-gray-50">
                   <td className="px-3 py-2 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2">
-                      <img src={token?.icon} alt={token?.symbol} className="w-5 h-5 rounded-full" />
-                      <span className="font-medium text-gray-900">{token?.symbol}</span>
+                      <img src={tokenInfo.icon} alt={tokenInfo.symbol} className="w-5 h-5 rounded-full" />
+                      <span className="font-medium text-gray-900">{tokenInfo.symbol}</span>
                     </div>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">
-                    {formatBalance(balance?.balance, token?.decimals || 8)}
+                    {formatBalance(balance?.balance, tokenInfo.decimals)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">
-                    {outputs.length}
+                    {outputCount}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm">
                     {hasLowLiquidity ? (
@@ -162,32 +186,32 @@ export function LiquidityList() {
                     )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-right text-sm">
-                    {hasLowLiquidity && (
+                    <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleSplitClick(asset, outputs)}
+                        onClick={() => handleSplitClick(token, outputs)}
                         disabled={isProcessing}
-                        className={`
-                          min-w-[80px] px-3 py-1 text-xs font-medium rounded-md
-                          flex items-center justify-center gap-1.5 shadow-sm
-                          ${isProcessing
-                            ? 'bg-gray-100 text-gray-500'
-                            : 'bg-white border border-yellow-200 text-yellow-900 hover:bg-yellow-50 hover:border-yellow-300'
-                          }
-                        `}
+                        className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 ${
+                          hasLowLiquidity 
+                            ? 'text-amber-700 bg-amber-100 hover:bg-amber-200'
+                            : 'text-blue-700 bg-blue-100 hover:bg-blue-200'
+                        }`}
                       >
-                        {isProcessing ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Fixing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <SplitSquareHorizontal className="w-3 h-3" />
-                            <span>Split UTXOs</span>
-                          </>
-                        )}
+                        {hasLowLiquidity && <AlertTriangle className="w-4 h-4 mr-1 text-amber-500" />}
+                        <SplitSquareHorizontal className="w-4 h-4 mr-1" />
+                        Split
                       </button>
-                    )}
+                      <button
+                        onClick={() => handleOpenAutoSplitConfig(token)}
+                        className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 ${
+                          autoSplitConfigs[tokenInfo.name]
+                            ? 'text-green-700 bg-green-100 hover:bg-green-200'
+                            : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Settings className="w-4 h-4 mr-1" />
+                        {autoSplitConfigs[tokenInfo.name] ? 'Auto-Split On' : 'Auto-Split Off'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -201,7 +225,13 @@ export function LiquidityList() {
         onClose={() => setSelectedAsset(null)}
         asset={selectedAsset || ''}
         outputs={selectedOutputs}
-        totalBalance={balances.find(b => b.token === selectedAsset)?.balance || 0}
+        totalBalance={balances.find(b => b.token === selectedAsset)?.balance ? Number(balances.find(b => b.token === selectedAsset)?.balance) : 0}
+      />
+
+      <AutoSplitConfigModal
+        isOpen={isAutoSplitModalOpen}
+        onClose={() => setIsAutoSplitModalOpen(false)}
+        assetName={selectedAutoSplitAsset}
       />
     </div>
   );

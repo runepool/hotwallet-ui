@@ -3,8 +3,10 @@ import { Settings, Key, Link, Radio, Plus, Trash2, Save, AlertCircle, RefreshCw 
 import { UserSettings } from '../types/api';
 import { getApiClient } from '../services/api-provider';
 import { generateSecretKey, getPublicKey } from "nostr-tools";
+import { AutoSplitConfigModal } from './AutoSplitConfigModal';
 
 import { Buffer } from 'buffer';
+
 interface ConfigurationPageProps {
   autoGenerateNostr?: boolean;
   onClose?: () => void;
@@ -143,35 +145,42 @@ export function ConfigurationPage({ autoGenerateNostr = false, onClose }: Config
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md">
-      <div className="flex items-center justify-between p-4 border-b">
-        <h2 className="text-lg font-semibold text-gray-900">Configuration</h2>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <Settings className="w-6 h-6 mr-2" />
+          <h2 className="text-xl font-semibold">Configuration</h2>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ×
+          </button>
+        )}
       </div>
-      
-      <div className="p-4">
-        {error && (
-          <div className="mb-4 px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1.5">
-            <AlertCircle className="w-4 h-4" />
-            <span>{error}</span>
-          </div>
-        )}
 
-        {saved && (
-          <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-md flex items-center gap-2">
-            <Save className="w-5 h-5 flex-shrink-0" />
-            <span>Configuration saved successfully!</span>
-          </div>
-        )}
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          {error}
+        </div>
+      )}
 
-        <div className="space-y-6">
+      {saved && (
+        <div className="mb-4 p-4 bg-green-100 text-green-700 rounded flex items-center">
+          <Save className="w-5 h-5 mr-2" />
+          Settings saved successfully!
+        </div>
+      )}
+
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-medium mb-4 flex items-center">
+            <Key className="w-5 h-5 mr-2" />
+            Keys
+          </h3>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <div className="flex items-center gap-2">
@@ -219,79 +228,81 @@ export function ConfigurationPage({ autoGenerateNostr = false, onClose }: Config
               {showGeneratedKey ? 'Click Save to store the key locally' : 'Your Nostr private key is stored locally'}
             </p>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <div className="flex items-center gap-2">
-                <Link className="w-4 h-4" />
-                ORD URL
-              </div>
-            </label>
-            <input
-              type="url"
-              value={config.ordUrl}
-              onChange={(e) => setConfig(prev => ({ ...prev, ordUrl: e.target.value }))}
-              placeholder="https://ord.runepool.io"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-medium mb-4 flex items-center">
+            <Link className="w-5 h-5 mr-2" />
+            Ord URL
+          </h3>
+          <input
+            type="url"
+            value={config.ordUrl}
+            onChange={(e) => setConfig(prev => ({ ...prev, ordUrl: e.target.value }))}
+            placeholder="https://ord.runepool.io"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4" />
-                Nostr Relays
-              </div>
-            </label>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-medium mb-4 flex items-center">
+            <Radio className="w-5 h-5 mr-2" />
+            Nostr Relays
+          </h3>
 
-            <div className="space-y-2">
-              {config.nostrRelays.map((relay, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={relay}
-                    onChange={(e) => {
-                      const updatedRelays = [...config.nostrRelays];
-                      updatedRelays[index] = e.target.value;
-                      setConfig(prev => ({ ...prev, nostrRelays: updatedRelays }));
-                    }}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={() => removeRelay(index)}
-                    className="p-2 text-red-600 hover:text-red-700 focus:outline-none"
-                    title="Remove relay"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              ))}
-
-              <div className="flex items-center gap-2">
+          <div className="space-y-2">
+            {config.nostrRelays.map((relay, index) => (
+              <div key={index} className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={newRelay}
-                  onChange={(e) => setNewRelay(e.target.value)}
-                  placeholder="wss://relay.example.com"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newRelay) {
-                      e.preventDefault();
-                      addRelay();
-                    }
+                  value={relay}
+                  onChange={(e) => {
+                    const updatedRelays = [...config.nostrRelays];
+                    updatedRelays[index] = e.target.value;
+                    setConfig(prev => ({ ...prev, nostrRelays: updatedRelays }));
                   }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button
-                  onClick={addRelay}
-                  className="p-2 text-blue-600 hover:text-blue-700 focus:outline-none"
-                  title="Add relay"
+                  onClick={() => removeRelay(index)}
+                  className="p-2 text-red-600 hover:text-red-700 focus:outline-none"
+                  title="Remove relay"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Trash2 className="w-5 h-5" />
                 </button>
               </div>
+            ))}
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newRelay}
+                onChange={(e) => setNewRelay(e.target.value)}
+                placeholder="wss://relay.example.com"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newRelay) {
+                    e.preventDefault();
+                    addRelay();
+                  }
+                }}
+              />
+              <button
+                onClick={addRelay}
+                className="p-2 text-blue-600 hover:text-blue-700 focus:outline-none"
+                title="Add relay"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
             </div>
           </div>
+        </div>
 
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <AutoSplitConfigModal isOpen={true} onClose={() => {}} assetName="" />
+        </div>
+
+        <div className="flex justify-end space-x-4">
           <button
             onClick={handleSave}
             className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-2"

@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useMain } from '../context/MainContext';
 import { X, SplitSquareHorizontal, Loader2, AlertCircle } from 'lucide-react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
+import { OutputHealth } from '../types/api';
 
 interface SplitUtxoModalProps {
   isOpen: boolean;
   onClose: () => void;
   asset: string;
-  outputs: any[];
+  outputs: OutputHealth[];
   totalBalance: number;
 }
 

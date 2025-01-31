@@ -1,4 +1,4 @@
-import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest } from '../types/api';
+import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest, AutoSplitConfig } from '../types/api';
 
 export interface ApiClient {
   createOrder(order: CreateRuneOrderDto): Promise<void>;
@@ -15,6 +15,10 @@ export interface ApiClient {
   deleteOrder(orderId: string): Promise<void>;
   getLiquidityHealth(): Promise<OutputsHealth>;
   splitAsset(request: SplitAssetRequest): Promise<void>;
+  setAutoSplitConfig(config: AutoSplitConfig): Promise<void>;
+  getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig>;
+  getAllAutoSplitConfigs(): Promise<AutoSplitConfig[]>;
+  deleteAutoSplitConfig(assetName: string): Promise<void>;
 }
 
 export class HttpApiClient implements ApiClient {
@@ -134,5 +138,33 @@ export class HttpApiClient implements ApiClient {
     if (!response.ok) {
       throw new Error(`Failed to split asset: ${response.statusText}`);
     }
+  }
+
+  async setAutoSplitConfig(config: AutoSplitConfig): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/account/auto-split`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    if (!response.ok) throw new Error('Failed to set auto-split configuration');
+  }
+
+  async getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig> {
+    const response = await fetch(`${this.baseUrl}/account/auto-split/${encodeURIComponent(assetName)}`);
+    if (!response.ok) throw new Error('Failed to get auto-split configuration');
+    return response.json();
+  }
+
+  async getAllAutoSplitConfigs(): Promise<AutoSplitConfig[]> {
+    const response = await fetch(`${this.baseUrl}/account/auto-split`);
+    if (!response.ok) throw new Error('Failed to get auto-split configurations');
+    return response.json();
+  }
+
+  async deleteAutoSplitConfig(assetName: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/account/auto-split/${encodeURIComponent(assetName)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete auto-split configuration');
   }
 }

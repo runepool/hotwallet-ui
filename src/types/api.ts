@@ -92,6 +92,13 @@ export interface AppWarning {
   timestamp: number;
 }
 
+export interface AutoSplitConfig {
+  asset_name: string;    // Name of the rune/asset
+  enabled: boolean;      // Whether auto-split is enabled
+  max_cost: number;      // Maximum cost in sats for auto-split transactions
+  split_size: number;    // Size of each split in the asset amount
+}
+
 // API Response Types
 export interface ApiResponse<T> {
   data?: T;
