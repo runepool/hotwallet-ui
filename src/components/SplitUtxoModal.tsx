@@ -29,6 +29,42 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
       : AVAILABLE_TOKENS.find(t => t.name === asset);
   }, [asset]);
 
+  const MIN_BTC_SPLIT = 10_000; // 10k sats minimum per split
+
+  const maxAllowedSplits = useMemo(() => {
+    if (asset === 'BTC') {
+      return Math.min(100, Math.floor(totalBalance / MIN_BTC_SPLIT));
+    }
+    return 100;
+  }, [asset, totalBalance]);
+
+  const handleNumOutputsChange = (newValue: number) => {
+    const value = Math.max(outputs.length, Math.min(maxAllowedSplits, newValue));
+    setNumOutputs(value);
+    if (token && totalBalance > 0) {
+      const rawAmount = totalBalance / value;
+      setAmountPerSplit(+rawAmount.toFixed());
+    }
+  };
+
+  // Initialize numOutputs when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (outputs.length > numOutputs) {
+        setNumOutputs(outputs.length);
+      } else if (numOutputs > maxAllowedSplits) {
+        setNumOutputs(maxAllowedSplits);
+      }
+    }
+  }, [isOpen, outputs.length, maxAllowedSplits]);
+
+  const splitError = useMemo(() => {
+    if (asset === 'BTC' && amountPerSplit < MIN_BTC_SPLIT) {
+      return `Cannot split below ${MIN_BTC_SPLIT} satoshis per UTXO`;
+    }
+    return null;
+  }, [asset, amountPerSplit]);
+
   useEffect(() => {
     if (token && totalBalance > 0) {
       const rawAmount = totalBalance / numOutputs;
@@ -62,15 +98,6 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
     }
   };
 
-  const handleNumOutputsChange = (newValue: number) => {
-    const value = Math.max(2, Math.min(100, newValue));
-    setNumOutputs(value);
-    if (token && totalBalance > 0) {
-      const rawAmount = totalBalance / value;
-      setAmountPerSplit(+rawAmount.toFixed());
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
@@ -96,6 +123,14 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
                 <div className="flex items-center space-x-2">
                   <AlertCircle className="w-5 h-5 text-red-500" />
                   <span className="text-sm text-red-700">{error}</span>
+                </div>
+              </div>
+            )}
+            {splitError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                  <span className="text-sm text-red-700">{splitError}</span>
                 </div>
               </div>
             )}
@@ -127,16 +162,16 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
               <div className="flex items-center space-x-4">
                 <input
                   type="range"
-                  min="2"
-                  max="100"
+                  min={outputs.length}
+                  max={maxAllowedSplits}
                   value={numOutputs}
                   onChange={(e) => handleNumOutputsChange(parseInt(e.target.value))}
                   className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                 />
                 <input 
                   type="number"
-                  min="2"
-                  max="100"
+                  min={outputs.length}
+                  max={maxAllowedSplits}
                   value={numOutputs}
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
@@ -148,7 +183,7 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
                 />
               </div>
               <p className="text-sm text-gray-500">
-                Choose how many equal-sized UTXOs to split into (2-100)
+                Choose how many equal-sized UTXOs to split into ({outputs.length}-{maxAllowedSplits})
               </p>
               <div className="p-4 bg-yellow-50 rounded-md">
                 <div className="flex justify-between items-center">
@@ -177,15 +212,20 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
         <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            disabled={loading}
+            className={`px-4 py-2 text-sm font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+              loading 
+                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
+            }`}
           >
             Cancel
           </button>
           <button
             onClick={handleSplit}
-            disabled={loading}
+            disabled={loading || !!splitError}
             className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 ${
-              loading
+              loading || !!splitError
                 ? 'bg-gray-100 text-gray-500'
                 : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
             }`}
