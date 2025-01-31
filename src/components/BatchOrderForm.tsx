@@ -1,26 +1,48 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { CreateRuneOrderDto } from '../types/api';
-import { TokenBalance } from '../types/api';
+import { AlertCircle, ArrowUpDown, Coins, Hash, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { getAutoRebalancing, updateAutoRebalancing } from '../api/autoRebalancing';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { useMain } from '../context/MainContext';
-import { AlertCircle, Plus, ArrowUpDown, Coins, Hash } from 'lucide-react';
+import { CreateRuneOrderDto, TokenBalance } from '../types/api';
+import { AutoRebalancing } from './AutoRebalancing';
 
 interface BatchOrderFormProps {
   balances: TokenBalance[];
+  selectedToken: string | null;
+  onTokenSelect: (token: string | null) => void;
 }
 
-export function BatchOrderForm({ balances }: BatchOrderFormProps) {
+export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: BatchOrderFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
+  const [autoRebalancingEnabled, setAutoRebalancingEnabled] = useState(false);
+  const [autoRebalancingSpread, setAutoRebalancingSpread] = useState('0.5');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { addOrder } = useMain();
   const [currentOrder, setCurrentOrder] = useState<CreateRuneOrderDto>({
-    rune: AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')!.name || '',
+    rune: '',
     quantity: '',
     price: '',
     type: 'ask',
   });
+
+  useEffect(() => {
+    if (selectedToken) {
+      setCurrentOrder(prev => ({ ...prev, rune: selectedToken }));
+      // Fetch auto-rebalancing settings for the selected token
+      getAutoRebalancing(selectedToken)
+        .then(settings => {
+          setAutoRebalancingEnabled(settings.enabled);
+          setAutoRebalancingSpread(settings.spread);
+        })
+        .catch(err => {
+          console.error('Failed to fetch auto-rebalancing settings:', err);
+          setAutoRebalancingEnabled(false);
+          setAutoRebalancingSpread('0.5');
+        });
+    }
+  }, [selectedToken]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -33,7 +55,7 @@ export function BatchOrderForm({ balances }: BatchOrderFormProps) {
   }, []);
 
   const handleSubmit = async () => {
-    if (!currentOrder.quantity || !currentOrder.price) {
+    if (!currentOrder.quantity || !currentOrder.price || !currentOrder.rune) {
       setError('Please fill in all fields');
       return;
     }
@@ -55,12 +77,11 @@ export function BatchOrderForm({ balances }: BatchOrderFormProps) {
       });
 
       // Reset form
-      setCurrentOrder({
-        rune: AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')!.name || '',
+      setCurrentOrder(prev => ({
+        ...prev,
         quantity: '',
         price: '',
-        type: 'ask',
-      });
+      }));
       setError(null);
     } catch (err) {
       console.error('Failed to create order:', err);
@@ -70,82 +91,100 @@ export function BatchOrderForm({ balances }: BatchOrderFormProps) {
     }
   };
 
+  const handleAutoRebalancingChange = async (enabled: boolean) => {
+    try {
+      if (!currentOrder.rune) {
+        setError('Please select a token first');
+        return;
+      }
+      await updateAutoRebalancing(currentOrder.rune, {
+        enabled,
+        spread: autoRebalancingSpread,
+      });
+      setAutoRebalancingEnabled(enabled);
+    } catch (err) {
+      console.error('Failed to update auto-rebalancing:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update auto-rebalancing');
+    }
+  };
+
+  const handleSpreadChange = async (spread: string) => {
+    try {
+      if (!currentOrder.rune) {
+        setError('Please select a token first');
+        return;
+      }
+      await updateAutoRebalancing(currentOrder.rune, {
+        enabled: autoRebalancingEnabled,
+        spread,
+      });
+      setAutoRebalancingSpread(spread);
+    } catch (err) {
+      console.error('Failed to update auto-rebalancing:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update auto-rebalancing');
+    }
+  };
+
+  const handleTokenSelect = async (tokenName: string) => {
+    onTokenSelect(tokenName);
+    setIsTokenDropdownOpen(false);
+  };
+
   const selectableTokens = AVAILABLE_TOKENS.filter(token => token.symbol !== 'BTC');
-  const selectedToken = selectableTokens.find(token => token.name === currentOrder.rune);
+  const selectedTokenInfo = selectableTokens.find(token => token.name === selectedToken);
 
   return (
-    <div className="space-y-3">
-      <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
-              <button
-                onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'ask' }))}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${currentOrder.type === 'ask'
-                  ? 'bg-white text-red-600 shadow-sm'
-                  : 'text-gray-600 hover:text-red-600'
-                  }`}
-              >
-                Ask
-              </button>
-              <button
-                onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'bid' }))}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${currentOrder.type === 'bid'
-                  ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-600 hover:text-green-600'
-                  }`}
-              >
-                Bid
-              </button>
-            </div>
+    <div className="h-full flex flex-col">
+      <div className="p-3 border-b border-gray-100 flex justify-between items-center">
+        <h2 className="text-sm font-medium text-gray-900">Place Order</h2>
+        <div className="inline-flex items-center gap-0.5 bg-gray-50 p-0.5 rounded-lg text-xs">
+          <button
+            onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'ask' }))}
+            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+              currentOrder.type === 'ask'
+                ? 'bg-white text-red-600 shadow-sm'
+                : 'text-gray-600 hover:text-red-600'
+            }`}
+          >
+            Ask
+          </button>
+          <button
+            onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'bid' }))}
+            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+              currentOrder.type === 'bid'
+                ? 'bg-white text-green-600 shadow-sm'
+                : 'text-gray-600 hover:text-green-600'
+            }`}
+          >
+            Bid
+          </button>
+        </div>
+      </div>
 
-            <div className="flex items-center gap-2">
-              {[
-                {
-                  symbol: 'BTC',
-                  name: 'BTC',
-                  decimals: 8,
-                  icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'
-                },
-                ...AVAILABLE_TOKENS
-              ].map(token => {
-                const balance = balances.find(b => b.token === (token.symbol === 'BTC' ? 'BTC' : token.name));
-                const amount = balance ? (+balance.balance / 10 ** balance.decimals).toFixed(token.decimals) : '0';
-                return (
-                  <div
-                    key={token.name}
-                    className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded"
-                  >
-                    <img src={token.icon} alt={token.symbol} className="w-4 h-4 rounded-full" />
-                    <span className="text-sm font-medium">{token.symbol}</span>
-                    <span className="text-sm text-gray-500">{amount}</span>
-                  </div>
-                );
-              })}
-            </div>
+      <div className="flex-1 p-3">
+        {error && (
+          <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1 text-sm">
+            <AlertCircle className="w-4 h-4" />
+            <span>{error}</span>
           </div>
+        )}
 
-          {error && (
-            <div className="px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1 text-sm">
-              <AlertCircle className="w-4 h-4" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-3">
+        <div className="space-y-3">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Token</label>
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
-                  className="w-full h-[38px] pl-8 pr-8 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-left flex items-center text-sm"
+                  className="w-full h-9 pl-8 pr-8 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-left flex items-center text-sm"
                 >
                   <Coins className="h-4 w-4 text-gray-400 absolute left-2" />
-                  <span>{selectedToken?.symbol || 'Select Token'}</span>
-                  {selectedToken && (
+                  <span>{selectedTokenInfo?.symbol || 'Select'}</span>
+                  {selectedTokenInfo && (
                     <img
-                      src={selectedToken.icon}
-                      alt={selectedToken.symbol}
+                      src={selectedTokenInfo.icon}
+                      alt={selectedTokenInfo.symbol}
                       className="w-5 h-5 rounded-full absolute right-1.5"
                     />
                   )}
@@ -157,10 +196,7 @@ export function BatchOrderForm({ balances }: BatchOrderFormProps) {
                       {selectableTokens.map((token) => (
                         <button
                           key={token.symbol}
-                          onClick={() => {
-                            setCurrentOrder({ ...currentOrder, rune: token.name });
-                            setIsTokenDropdownOpen(false);
-                          }}
+                          onClick={() => handleTokenSelect(token.name)}
                           className="w-full px-3 py-1.5 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
                         >
                           <img src={token.icon} alt={token.symbol} className="w-5 h-5 rounded-full" />
@@ -175,56 +211,63 @@ export function BatchOrderForm({ balances }: BatchOrderFormProps) {
                 )}
               </div>
             </div>
-            <div className="col-span-3">
+
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Quantity</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                  <Hash className="h-4 w-4 text-gray-400" />
-                </div>
+                <Hash className="h-4 w-4 text-gray-400 absolute left-2 top-2.5" />
                 <input
                   type="text"
                   value={currentOrder.quantity}
                   onChange={(e) => setCurrentOrder({ ...currentOrder, quantity: e.target.value })}
                   placeholder="0.00"
-                  className="w-full h-[38px] pl-8 pr-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full h-9 pl-8 pr-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            <div className="col-span-3">
+
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Price (sats)</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M15 8H11.1667C9.97 8 9 8.97 9 10.1667C9 11.3633 9.97 12.3333 11.1667 12.3333H12.8333C14.03 12.3333 15 13.3033 15 14.5C15 15.6967 14.03 16.6667 12.8333 16.6667H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12 6V8M12 16.6667V18.6667" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
+                <Hash className="h-4 w-4 text-gray-400 absolute left-2 top-2.5" />
                 <input
                   type="text"
                   value={currentOrder.price}
                   onChange={(e) => setCurrentOrder({ ...currentOrder, price: e.target.value })}
                   placeholder="100,000"
-                  className="w-full h-[38px] pl-8 pr-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full h-9 pl-8 pr-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            <div className="col-span-3">
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className={`w-full h-[38px] bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5 transition-colors text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {loading ? (
-                  <ArrowUpDown className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4" />
-                    <span>Add Order</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
+
+          <div className="flex justify-between items-center">
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className={`w-full h-9 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5 text-sm font-medium ${
+                loading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {loading ? (
+                <ArrowUpDown className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span>Add Order</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <AutoRebalancing
+            enabled={autoRebalancingEnabled}
+            spread={autoRebalancingSpread}
+            onEnabledChange={handleAutoRebalancingChange}
+            onSpreadChange={handleSpreadChange}
+          />
         </div>
       </div>
     </div>

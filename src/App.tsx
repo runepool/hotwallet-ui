@@ -1,14 +1,12 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { OrderList } from './components/OrderList';
-import { BatchOrderForm } from './components/BatchOrderForm';
+import { AlertCircle, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { ConfigurationPage } from './components/ConfigurationPage';
-import { AlertCircle } from 'lucide-react';
-import { MainProvider, useMain } from './context/MainContext';
-import { getPublicKey } from './utils/nostr';
 import { Header } from './components/Header';
+import { OrderList } from './components/OrderList';
+import { MainProvider, useMain } from './context/MainContext';
 import { getApiClient } from './services/api-provider';
 import { WarningType } from './types/api';
-import { X } from 'lucide-react';
+import { getPublicKey } from './utils/nostr';
 
 function getWarningColor(type: WarningType): string {
   switch (type) {
@@ -131,7 +129,7 @@ function AppContent() {
             />
           ) : (
             <>
-              <BatchOrderForm balances={balances} />
+              {/* <BatchOrderForm balances={balances} /> */}
               <OrderList />
             </>
           )}

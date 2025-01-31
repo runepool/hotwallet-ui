@@ -6,16 +6,17 @@ import { AVAILABLE_TOKENS } from '../constants/runes';
 import { deleteOrder } from '../api/orders';
 import { TransactionList } from './TransactionList';
 import { LiquidityList } from './LiquidityList';
+import { BatchOrderForm } from './BatchOrderForm';
+import { TokenBalances } from './TokenBalances';
 
 interface OrderTableProps {
   orders: RuneOrder[];
-  title: string;
-  type: 'ask' | 'bid';
   searchTerm: string;
   onDeleteOrder: (orderId: string) => Promise<void>;
+  className?: string;
 }
 
-function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTableProps) {
+function OrderTable({ orders, title, type, searchTerm, onDeleteOrder, className, headerPosition = 'top', showColumnHeaders = false }: OrderTableProps & { headerPosition?: 'top' | 'bottom', title: string, type: 'ask' | 'bid', showColumnHeaders?: boolean }) {
   const { balances } = useMain();
 
   const hasEnoughBalance = (order: RuneOrder) => {
@@ -31,49 +32,61 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
     return (+order.quantity / 10 ** token.decimals).toString();
   };
 
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-[calc(100vh-20rem)]">
-      <div className="px-3 py-2 border-b border-gray-200 flex justify-between items-center shrink-0">
+  const header = (
+    <div className="px-3 py-1.5 border-b border-gray-100 flex items-center bg-white">
+      <div className="w-[35%] flex items-center gap-2">
         <h3 className="text-sm font-medium text-gray-900">{title}</h3>
         <span className="text-xs text-gray-500">{orders.length} orders</span>
       </div>
+      {showColumnHeaders && (
+        <>
+          <div className="w-[20%] text-right">
+            <span className="text-xs font-medium text-gray-500">Qty</span>
+          </div>
+          <div className="w-[20%] text-right">
+            <span className="text-xs font-medium text-gray-500">Price</span>
+          </div>
+          <div className="w-[15%] text-right">
+            <span className="text-xs font-medium text-gray-500">Filled</span>
+          </div>
+          <div className="w-[10%]"></div>
+        </>
+      )}
+    </div>
+  );
 
-      <div className="overflow-auto flex-1">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0">
-            <tr>
-              <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 bg-gray-50">Token</th>
-              <th className="px-2 py-1.5 text-right text-xs font-medium text-gray-500 bg-gray-50">Qty</th>
-              <th className="px-2 py-1.5 text-right text-xs font-medium text-gray-500 bg-gray-50">Price</th>
-              <th className="px-2 py-1.5 text-right text-xs font-medium text-gray-500 bg-gray-50">Filled</th>
-              <th className="w-8 px-2 py-1.5 bg-gray-50"></th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
-            {orders.map((order) => {
+  const ordersToDisplay = type === 'ask' ? [...orders].reverse() : orders;
+
+  return (
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col ${className}`}>
+      {headerPosition === 'top' && header}
+      <div className={`overflow-auto flex-1 ${type === 'ask' ? 'flex flex-col justify-end' : ''}`}>
+        <table className="min-w-full">
+          <tbody className={`divide-y divide-gray-100 ${type === 'ask' ? 'flex flex-col' : ''}`}>
+            {ordersToDisplay.map((order) => {
               const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
               const progress = order.filledQuantity ? (+order.filledQuantity / +order.quantity) * 100 : 0;
               return (
-                <tr key={order.id} className="hover:bg-gray-50 relative">
-                  <td className="px-2 py-1.5 whitespace-nowrap text-sm">
-                    <div className="flex items-center gap-1.5">
-                      <img src={token?.icon} alt={token?.symbol} className="w-4 h-4 rounded-full" />
-                      <span className="font-medium">{token?.symbol}</span>
+                <tr key={order.id} className={`hover:bg-gray-50 relative ${type === 'ask' ? 'flex' : ''}`}>
+                  <td className="w-[35%] px-3 py-2 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <img src={token?.icon} alt={token?.symbol} className="w-5 h-5 rounded-full" />
+                      <span className="font-medium text-sm text-gray-900">{token?.symbol}</span>
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm">
+                  <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm text-gray-900">
                     {formatQuantity(order)}
                   </td>
-                  <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm">
+                  <td className={`w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm font-medium ${type === 'ask' ? 'text-red-500' : 'text-green-500'}`}>
                     {order.price}
                   </td>
-                  <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm">
-                    <span className="text-xs text-gray-500">{progress.toFixed(2)}%</span>
+                  <td className="w-[15%] px-3 py-2 text-right whitespace-nowrap">
+                    <span className="text-xs font-medium text-gray-500">{progress.toFixed(2)}%</span>
                   </td>
-                  <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                  <td className="w-[10%] px-3 py-2 text-right whitespace-nowrap">
                     <button
                       onClick={() => onDeleteOrder(order.id)}
-                      className="text-gray-400 hover:text-red-500"
+                      className="text-gray-400 hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -83,7 +96,7 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
                     <td
                       className="absolute inset-0 pointer-events-none"
                       style={{
-                        background: `linear-gradient(to right, ${type === 'bid' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)'} ${progress}%, transparent ${progress}%)`
+                        background: `linear-gradient(to right, ${type === 'ask' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(34, 197, 94, 0.05)'} ${progress}%, transparent ${progress}%)`
                       }}
                     />
                   )}
@@ -91,15 +104,16 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
               );
             })}
             {orders.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-2 py-3 text-center text-sm text-gray-500">
-                  No {type} orders found
+              <tr className={type === 'ask' ? 'flex' : ''}>
+                <td colSpan={5} className="px-3 py-4 text-center">
+                  <span className="text-sm text-gray-500">No {type} orders</span>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+      {headerPosition === 'bottom' && header}
     </div>
   );
 }
@@ -107,8 +121,10 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder }: OrderTab
 export function OrderList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
-  const { orders, deleteOrder, refreshOrders, warnings, outputsHealth } = useMain();
+  const { orders, deleteOrder, refreshOrders, warnings, outputsHealth, balances } = useMain();
   const [loading, setLoading] = useState(false);
+  const defaultToken = AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')?.name || null;
+  const [selectedToken, setSelectedToken] = useState<string | null>(defaultToken);
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
@@ -123,6 +139,7 @@ export function OrderList() {
   };
 
   const filteredOrders = orders.filter(order => {
+    if (selectedToken && order.rune !== selectedToken) return false;
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -203,21 +220,58 @@ export function OrderList() {
       </div>
 
       {activeView === 'orders' && (
-        <div className="grid grid-cols-2 gap-4">
-          <OrderTable
-            orders={askOrders}
-            title="Ask Orders"
-            type="ask"
-            searchTerm={searchTerm}
-            onDeleteOrder={handleDeleteOrder}
-          />
-          <OrderTable
-            orders={bidOrders}
-            title="Bid Orders"
-            type="bid"
-            searchTerm={searchTerm}
-            onDeleteOrder={handleDeleteOrder}
-          />
+        <div className="flex gap-4">
+          <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-10rem)]">
+              <OrderTable
+                orders={askOrders}
+                title="Ask Orders"
+                type="ask"
+                searchTerm={searchTerm}
+                onDeleteOrder={handleDeleteOrder}
+                className="flex-1 rounded-none border-0 flex flex-col justify-end"
+                headerPosition="top"
+                showColumnHeaders={true}
+              />
+              
+              {/* Spread indicator */}
+              {askOrders.length > 0 && bidOrders.length > 0 && (
+                <div className="px-3 py-1.5 border-y border-gray-100 bg-gray-50/75">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-gray-500">Spread</span>
+                    <span className="text-xs font-medium text-gray-900">
+                      {((+askOrders[0].price - +bidOrders[0].price) / +askOrders[0].price * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <OrderTable
+                orders={bidOrders}
+                title="Bid Orders"
+                type="bid"
+                searchTerm={searchTerm}
+                onDeleteOrder={handleDeleteOrder}
+                className="flex-1 rounded-none border-0"
+                headerPosition="bottom"
+                showColumnHeaders={false}
+              />
+            </div>
+          </div>
+          
+          <div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200">
+              <BatchOrderForm 
+                balances={balances} 
+                selectedToken={selectedToken}
+                onTokenSelect={setSelectedToken}
+              />
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+              <h2 className="text-sm font-medium text-gray-900 mb-3">Token Balances</h2>
+              <TokenBalances balances={balances} />
+            </div>
+          </div>
         </div>
       )}
       {activeView === 'transactions' && <TransactionList searchTerm={searchTerm} />}

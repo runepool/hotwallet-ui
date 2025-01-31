@@ -99,6 +99,11 @@ export interface AutoSplitConfig {
   split_size: number;    // Size of each split in the asset amount
 }
 
+export interface AutoRebalancingSettings {
+  enabled: boolean;
+  spread: string;
+}
+
 // API Response Types
 export interface ApiResponse<T> {
   data?: T;

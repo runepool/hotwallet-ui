@@ -1,4 +1,4 @@
-import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest, AutoSplitConfig } from '../types/api';
+import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest, AutoSplitConfig, AutoRebalancingSettings } from '../types/api';
 
 export interface ApiClient {
   createOrder(order: CreateRuneOrderDto): Promise<void>;
@@ -19,6 +19,8 @@ export interface ApiClient {
   getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig>;
   getAllAutoSplitConfigs(): Promise<AutoSplitConfig[]>;
   deleteAutoSplitConfig(assetName: string): Promise<void>;
+  updateAutoRebalancing(asset: string, settings: AutoRebalancingSettings): Promise<void>;
+  getAutoRebalancing(asset: string): Promise<AutoRebalancingSettings>;
 }
 
 export class HttpApiClient implements ApiClient {
@@ -162,9 +164,24 @@ export class HttpApiClient implements ApiClient {
   }
 
   async deleteAutoSplitConfig(assetName: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/account/auto-split/${encodeURIComponent(assetName)}`, {
+    const response = await fetch(`${this.baseUrl}/auto-split/${assetName}`, {
       method: 'DELETE',
     });
-    if (!response.ok) throw new Error('Failed to delete auto-split configuration');
+    if (!response.ok) throw new Error('Failed to delete auto-split config');
+  }
+
+  async updateAutoRebalancing(asset: string, settings: AutoRebalancingSettings): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/auto-rebalancing/${asset}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    if (!response.ok) throw new Error('Failed to update auto-rebalancing settings');
+  }
+
+  async getAutoRebalancing(asset: string): Promise<AutoRebalancingSettings> {
+    const response = await fetch(`${this.baseUrl}/auto-rebalancing/${asset}`);
+    if (!response.ok) throw new Error('Failed to fetch auto-rebalancing settings');
+    return response.json();
   }
 }
