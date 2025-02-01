@@ -171,10 +171,14 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName, onConfigSaved
                   <div className="mt-1 relative">
                     <input
                       type="number"
-                      value={newConfig.split_size}
-                      onChange={(e) => setNewConfig(prev => ({ ...prev, split_size: parseInt(e.target.value) || 0 }))}
+                      value={newConfig.split_size / Math.pow(10, token.decimals)}
+                      onChange={(e) => setNewConfig(prev => ({ 
+                        ...prev, 
+                        split_size: Math.floor((parseFloat(e.target.value) || 0) * Math.pow(10, token.decimals))
+                      }))}
                       className="block w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 transition-all duration-200 bg-white shadow-sm"
-                      min="1"
+                      min={1 / Math.pow(10, token.decimals)}
+                      step={1 / Math.pow(10, token.decimals)}
                     />
                     <div className="mt-1.5 text-sm text-gray-500 flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
