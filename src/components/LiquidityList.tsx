@@ -16,21 +16,22 @@ export function LiquidityList() {
   const [selectedAutoSplitAsset, setSelectedAutoSplitAsset] = useState<string>('');
   const [autoSplitConfigs, setAutoSplitConfigs] = useState<Record<string, boolean>>({});
 
+  const fetchAutoSplitConfigs = async () => {
+    try {
+      const configs = await apiClient.getAllAutoSplitConfigs();
+      const configMap = configs.reduce((acc, config) => ({
+        ...acc,
+        [config.asset_name]: config.enabled
+      }), {});
+      setAutoSplitConfigs(configMap);
+    } catch (error) {
+      console.error('Failed to fetch auto-split configs:', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchAutoSplitConfigs = async () => {
-      try {
-        const configs = await apiClient.getAllAutoSplitConfigs();
-        const configMap = configs.reduce((acc, config) => ({
-          ...acc,
-          [config.asset_name]: config.enabled
-        }), {});
-        setAutoSplitConfigs(configMap);
-      } catch (error) {
-        console.error('Failed to fetch auto-split configs:', error);
-      }
-    };
     fetchAutoSplitConfigs();
-  }, [apiClient]);
+  }, []);
 
   if (!outputsHealth) {
     return (
@@ -203,13 +204,13 @@ export function LiquidityList() {
                       <button
                         onClick={() => handleOpenAutoSplitConfig(token)}
                         className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 ${
-                          autoSplitConfigs[tokenInfo.name]
+                          autoSplitConfigs[token]
                             ? 'text-green-700 bg-green-100 hover:bg-green-200'
                             : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
                         }`}
                       >
                         <Settings className="w-4 h-4 mr-1" />
-                        {autoSplitConfigs[tokenInfo.name] ? 'Auto-Split On' : 'Auto-Split Off'}
+                        {autoSplitConfigs[token] ? 'Auto-Split On' : 'Auto-Split Off'}
                       </button>
                     </div>
                   </td>
@@ -232,6 +233,7 @@ export function LiquidityList() {
         isOpen={isAutoSplitModalOpen}
         onClose={() => setIsAutoSplitModalOpen(false)}
         assetName={selectedAutoSplitAsset}
+        onConfigSaved={fetchAutoSplitConfigs}
       />
     </div>
   );

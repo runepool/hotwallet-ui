@@ -8,16 +8,17 @@ interface AutoSplitConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
   assetName: string;
+  onConfigSaved?: () => void;
 }
 
-export function AutoSplitConfigModal({ isOpen, onClose, assetName }: AutoSplitConfigModalProps) {
+export function AutoSplitConfigModal({ isOpen, onClose, assetName, onConfigSaved }: AutoSplitConfigModalProps) {
   const { apiClient } = useMain();
   const [configs, setConfigs] = useState<AutoSplitConfig[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [newConfig, setNewConfig] = useState<AutoSplitConfig>({
     asset_name: assetName,
-    enabled: true,
+    enabled: false,
     max_cost: 1000,
     split_size: 10000,
   });
@@ -35,9 +36,28 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName }: AutoSplitCo
   useEffect(() => {
     if (isOpen) {
       fetchConfigs();
-      setNewConfig(prev => ({ ...prev, asset_name: assetName }));
+    }
+    // Reset error/success messages when modal closes
+    if (!isOpen) {
+      setError(null);
+      setSuccess(null);
     }
   }, [isOpen, assetName]);
+
+  // Set default config when asset changes
+  useEffect(() => {
+    const existingConfig = configs.find(config => config.asset_name === assetName);
+    if (existingConfig) {
+      setNewConfig(existingConfig);
+    } else {
+      setNewConfig({
+        asset_name: assetName,
+        enabled: false,
+        max_cost: 1000,
+        split_size: 10000,
+      });
+    }
+  }, [assetName, configs]);
 
   const showNotification = (message: string, isError: boolean) => {
     if (isError) {
@@ -62,6 +82,8 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName }: AutoSplitCo
       await apiClient.setAutoSplitConfig(newConfig);
       showNotification('Configuration saved successfully', false);
       fetchConfigs();
+      onConfigSaved?.();
+      onClose();  // Close the modal after successful save
     } catch (error) {
       showNotification(
         error instanceof Error ? error.message : 'Failed to save configuration',
@@ -144,7 +166,7 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName }: AutoSplitCo
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Split Size ({token.symbol})
+                    Split Size ({token.symbol === 'BTC' ? 'sats' : token.symbol})
                   </label>
                   <div className="mt-1 relative">
                     <input
@@ -183,7 +205,7 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName }: AutoSplitCo
                 <div className="p-4 bg-yellow-50 rounded-md">
                   <h4 className="text-sm font-medium text-yellow-800 mb-2">How it works</h4>
                   <p className="text-sm text-yellow-700">
-                    When enabled, your {token.symbol} UTXOs will be automatically split into at least split size. 
+                    When enabled, your {token.symbol === 'BTC' ? 'BTC' : token.symbol} UTXOs will be automatically split into at least {token.symbol === 'BTC' ? 'sats' : token.symbol} split size. 
                     The system will ensure the transaction fee doesn't exceed the maximum cost.
                   </p>
                 </div>
