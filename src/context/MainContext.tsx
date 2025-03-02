@@ -110,10 +110,14 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
       clearWarningsByType(WarningType.ORDER_ERROR);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
-      addWarning(
-        WarningType.ORDER_ERROR,
-        'Unable to connect to server. Please ensure the API is running.'
-      );
+      
+      // Only show the error warning if it's not a JSON parsing error
+      if (!(error instanceof Error && error.message.includes('parse'))) {
+        addWarning(
+          WarningType.ORDER_ERROR,
+          'Unable to connect to server. Please ensure the API is running.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -142,11 +146,15 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
       setBalances(scaledBalances);
       clearWarningsByType(WarningType.BALANCE_ERROR);
     } catch (err) {
-      addWarning(
-        WarningType.BALANCE_ERROR,
-        'Unable to connect to server. Please ensure the API is running.'
-      );
       console.error('Failed to fetch balances:', err);
+      
+      // Only show the error warning if it's not a JSON parsing error
+      if (!(err instanceof Error && err.message.includes('parse'))) {
+        addWarning(
+          WarningType.BALANCE_ERROR,
+          'Unable to connect to server. Please ensure the API is running.'
+        );
+      }
     } finally {
       setIsFetchingBalances(false);
     }
@@ -168,10 +176,14 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Failed to fetch liquidity health:', error);
-      addWarning(
-        WarningType.NETWORK_ERROR,
-        'Unable to connect to server. Please ensure the API is running.'
-      );
+      
+      // Only show the network error warning if it's not a JSON parsing error
+      if (error instanceof Error && error.message !== 'Failed to parse liquidity health data') {
+        addWarning(
+          WarningType.NETWORK_ERROR,
+          'Unable to connect to server. Please ensure the API is running.'
+        );
+      }
     } finally {
       refreshingHealth.current = false;
     }
@@ -183,10 +195,14 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
       await refreshOrders();
     } catch (error) {
       console.error('Failed to delete order:', error);
-      addWarning(
-        WarningType.ORDER_ERROR,
-        `Failed to delete order ${orderId}`
-      );
+      
+      // Only show the error warning if it's not a JSON parsing error
+      if (!(error instanceof Error && error.message.includes('parse'))) {
+        addWarning(
+          WarningType.ORDER_ERROR,
+          `Failed to delete order ${orderId}`
+        );
+      }
     }
   }, [refreshOrders]);
 
@@ -207,10 +223,14 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
       clearWarningsByType(WarningType.ORDER_ERROR);
     } catch (error) {
       console.error('Failed to add order:', error);
-      addWarning(
-        WarningType.ORDER_ERROR,
-        'Failed to add order. Please try again.'
-      );
+      
+      // Only show the error warning if it's not a JSON parsing error
+      if (!(error instanceof Error && error.message.includes('parse'))) {
+        addWarning(
+          WarningType.ORDER_ERROR,
+          'Failed to add order. Please try again.'
+        );
+      }
       throw error;
     }
   }, [apiClient, refreshOrders, clearWarningsByType, addWarning]);

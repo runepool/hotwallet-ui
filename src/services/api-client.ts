@@ -42,13 +42,23 @@ export class HttpApiClient implements ApiClient {
   async getOrders(): Promise<RuneOrder[]> {
     const response = await fetch(`${this.baseUrl}/orders`);
     if (!response.ok) throw new Error('Failed to fetch orders');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse orders data');
+    }
   }
 
   async getOrderById(orderId: string): Promise<RuneOrder> {
     const response = await fetch(`${this.baseUrl}/orders/${orderId}`);
     if (!response.ok) throw new Error('Order not found');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse order data');
+    }
   }
 
   async createBatchOrders(orders: CreateBatchRuneOrderDto): Promise<void> {
@@ -63,19 +73,34 @@ export class HttpApiClient implements ApiClient {
   async getTokenBalances(): Promise<TokenBalance[]> {
     const response = await fetch(`${this.baseUrl}/account/balance`);
     if (!response.ok) throw new Error('Failed to fetch token balances');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse token balances data');
+    }
   }
 
   async getTransactions(): Promise<Transaction[]> {
     const response = await fetch(`${this.baseUrl}/transactions`);
     if (!response.ok) throw new Error('Failed to fetch transactions');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse transactions data');
+    }
   }
 
   async getSettings(): Promise<UserSettings> {
     const response = await fetch(`${this.baseUrl}/settings`);
     if (!response.ok) throw new Error('Failed to fetch settings');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse settings data');
+    }
   }
 
   async updateSettings(settings: UserSettings): Promise<void> {
@@ -90,13 +115,23 @@ export class HttpApiClient implements ApiClient {
   async getPendingTransactions(): Promise<Transaction[]> {
     const response = await fetch(`${this.baseUrl}/pending-transactions`);
     if (!response.ok) throw new Error('Failed to fetch pending transactions');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse pending transactions data');
+    }
   }
 
   async getPendingTransactionById(id: string): Promise<Transaction> {
     const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`);
     if (!response.ok) throw new Error('Failed to fetch pending transaction');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse pending transaction data');
+    }
   }
 
   async deletePendingTransaction(id: string): Promise<void> {
@@ -125,7 +160,12 @@ export class HttpApiClient implements ApiClient {
       throw new Error(`Failed to get liquidity health: ${response.statusText}`);
     }
 
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse liquidity health data');
+    }
   }
 
   async splitAsset(request: SplitAssetRequest): Promise<void> {
@@ -154,13 +194,23 @@ export class HttpApiClient implements ApiClient {
   async getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig> {
     const response = await fetch(`${this.baseUrl}/account/auto-split/${encodeURIComponent(assetName)}`);
     if (!response.ok) throw new Error('Failed to get auto-split configuration');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse auto-split configuration data');
+    }
   }
 
   async getAllAutoSplitConfigs(): Promise<AutoSplitConfig[]> {
     const response = await fetch(`${this.baseUrl}/account/auto-split`);
     if (!response.ok) throw new Error('Failed to get auto-split configurations');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse auto-split configurations data');
+    }
   }
 
   async deleteAutoSplitConfig(assetName: string): Promise<void> {
@@ -182,6 +232,11 @@ export class HttpApiClient implements ApiClient {
   async getAutoRebalancing(asset: string): Promise<AutoRebalancingSettings> {
     const response = await fetch(`${this.baseUrl}/auto-rebalancing/${asset}`);
     if (!response.ok) throw new Error('Failed to fetch auto-rebalancing settings');
-    return response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse auto-rebalancing settings data');
+    }
   }
 }
