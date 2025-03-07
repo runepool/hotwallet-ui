@@ -192,7 +192,7 @@ export class HttpApiClient implements ApiClient {
   }
 
   async getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig> {
-    const response = await fetch(`${this.baseUrl}/account/auto-split/${encodeURIComponent(assetName)}`);
+    const response = await fetch(`${this.baseUrl}/account/auto-split/${assetName}`);
     if (!response.ok) throw new Error('Failed to get auto-split configuration');
     try {
       return await response.json();
@@ -221,19 +221,33 @@ export class HttpApiClient implements ApiClient {
   }
 
   async updateAutoRebalancing(asset: string, settings: AutoRebalancingSettings): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/auto-rebalancing/${asset}`, {
-      method: 'POST',
+    const response = await fetch(`${this.baseUrl}/rebalance/${asset}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
+      body: JSON.stringify({
+        assetName: asset,
+        enabled: settings.enabled,
+        spread: settings.spread
+      }),
     });
     if (!response.ok) throw new Error('Failed to update auto-rebalancing settings');
   }
 
   async getAutoRebalancing(asset: string): Promise<AutoRebalancingSettings> {
-    const response = await fetch(`${this.baseUrl}/auto-rebalancing/${asset}`);
-    if (!response.ok) throw new Error('Failed to fetch auto-rebalancing settings');
+    const response = await fetch(`${this.baseUrl}/rebalance/${asset}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        // Return default settings if configuration doesn't exist yet
+        return { enabled: false, spread: '0.5' };
+      }
+      throw new Error('Failed to fetch auto-rebalancing settings');
+    }
     try {
-      return await response.json();
+      const data = await response.json();
+      return {
+        enabled: data.enabled,
+        spread: data.spread.toString()
+      };
     } catch (error) {
       console.error('Failed to parse JSON response:', error);
       throw new Error('Failed to parse auto-rebalancing settings data');

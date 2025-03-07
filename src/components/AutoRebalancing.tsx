@@ -6,9 +6,10 @@ interface AutoRebalancingProps {
   spread: string;
   onEnabledChange: (enabled: boolean) => void;
   onSpreadChange: (spread: string) => void;
+  onSpreadBlur?: () => void;
 }
 
-export function AutoRebalancing({ enabled, spread, onEnabledChange, onSpreadChange }: AutoRebalancingProps) {
+export function AutoRebalancing({ enabled, spread, onEnabledChange, onSpreadChange, onSpreadBlur }: AutoRebalancingProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -35,6 +36,7 @@ export function AutoRebalancing({ enabled, spread, onEnabledChange, onSpreadChan
             type="text"
             value={spread}
             onChange={(e) => onSpreadChange(e.target.value)}
+            onBlur={onSpreadBlur}
             placeholder="0.5"
             disabled={!enabled}
             className={`w-full h-9 pl-8 pr-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
