@@ -71,7 +71,7 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
 
       await addOrder({
         rune: currentOrder.rune,
-        quantity: currentOrder.quantity,
+        quantity: (+currentOrder.quantity * 10 ** selectedToken.decimals).toFixed(0),
         price: currentOrder.price,
         type: currentOrder.type
       });

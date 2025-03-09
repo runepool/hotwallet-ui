@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createOrder } from '../api/orders';
 import { CreateRuneOrderDto } from '../types/api';
 import { AlertCircle } from 'lucide-react';
-import { AVAILABLE_RUNES } from '../constants/runes';
+import { AVAILABLE_TOKENS } from '../constants/runes';
 import { useOrders } from '../context/OrderContext';
 
 export function OrderForm() {
@@ -10,7 +10,7 @@ export function OrderForm() {
   const [error, setError] = useState<string | null>(null);
   const { addOrder } = useOrders();
   const [order, setOrder] = useState<CreateRuneOrderDto>({
-    rune: AVAILABLE_RUNES[0],
+    rune: AVAILABLE_TOKENS[0].name,
     quantity: '',
     price: '',
     type: 'ask',
@@ -22,9 +22,19 @@ export function OrderForm() {
     setError(null);
 
     try {
-      await createOrder(order);
+
+      const rune = AVAILABLE_TOKENS.find(r => r.name === order.rune);
+      const decimals = rune?.decimals ? 10 ** rune.decimals : 1;
+      
+      await createOrder({
+        price: order.price,
+        quantity: (+order.quantity * decimals).toFixed(0),
+        rune: rune?.name || '',
+        type: order.type
+      });
+
       addOrder(order);
-      setOrder({ rune: AVAILABLE_RUNES[0], quantity: '', price: '', type: 'ask' });
+      setOrder({ rune: AVAILABLE_TOKENS[0].name, quantity: '', price: '', type: 'ask' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create order');
     } finally {
@@ -35,7 +45,7 @@ export function OrderForm() {
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-bold mb-6">Create New Order</h2>
-      
+
       {error && (
         <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-md flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
@@ -52,7 +62,7 @@ export function OrderForm() {
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             required
           >
-            {AVAILABLE_RUNES.map((rune) => (
+            {AVAILABLE_TOKENS.map((rune) => (
               <option key={rune} value={rune}>{rune}</option>
             ))}
           </select>
@@ -95,9 +105,8 @@ export function OrderForm() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
         >
           {loading ? 'Creating...' : 'Create Order'}
         </button>
