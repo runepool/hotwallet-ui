@@ -299,23 +299,6 @@ export function ConfigurationPage({ autoGenerateNostr = false, onClose }: Config
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <AutoSplitConfigModal isOpen={true} onClose={() => {}} assetName="" />
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-medium mb-4 flex items-center">
-            <BarChart2 className="w-5 h-5 mr-2" />
-            Auto Rebalancing
-          </h3>
-          <div className="mb-4">
-            <p className="text-sm text-gray-500 mb-4">
-              Configure automatic rebalancing of your liquidity with a specified spread percentage.
-            </p>
-            <AutoRebalancingContainer assetName="RUNE" />
-          </div>
-        </div>
-
         <div className="flex justify-end space-x-4">
           <button
             onClick={handleSave}
