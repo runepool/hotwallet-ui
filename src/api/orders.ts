@@ -24,3 +24,7 @@ export async function getTokenBalances(): Promise<TokenBalance[]> {
 export async function deleteOrder(orderId: string): Promise<void> {
   return getApiClient().deleteOrder(orderId);
 }
+
+export async function getActiveOrders(asset?: string): Promise<RuneOrder[]> {
+  return getApiClient().getActiveOrders(asset);
+}

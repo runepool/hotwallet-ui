@@ -3,6 +3,7 @@ import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, T
 export interface ApiClient {
   createOrder(order: CreateRuneOrderDto): Promise<void>;
   getOrders(): Promise<RuneOrder[]>;
+  getActiveOrders(asset?: string): Promise<RuneOrder[]>;
   getOrderById(orderId: string): Promise<RuneOrder>;
   createBatchOrders(orders: CreateBatchRuneOrderDto): Promise<void>;
   getTokenBalances(): Promise<TokenBalance[]>;
@@ -47,6 +48,18 @@ export class HttpApiClient implements ApiClient {
     } catch (error) {
       console.error('Failed to parse JSON response:', error);
       throw new Error('Failed to parse orders data');
+    }
+  }
+
+  async getActiveOrders(asset?: string): Promise<RuneOrder[]> {
+    const params = asset ? `?asset=${asset}` : '';
+    const response = await fetch(`${this.baseUrl}/orders/active${params}`);
+    if (!response.ok) throw new Error('Failed to fetch active orders');
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse active orders data');
     }
   }
 

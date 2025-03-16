@@ -1,31 +1,21 @@
-import React, { useState, useMemo } from 'react';
-import { AlertCircle, ArrowUpDown, ArrowUpCircle, ArrowDownCircle, Search, Trash2, X } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AVAILABLE_TOKENS } from '../constants/runes';
 import { useMain } from '../context/MainContext';
 import { RuneOrder } from '../types/api';
-import { AVAILABLE_TOKENS } from '../constants/runes';
-import { deleteOrder } from '../api/orders';
-import { TransactionList } from './TransactionList';
-import { LiquidityList } from './LiquidityList';
 import { BatchOrderForm } from './BatchOrderForm';
+import { LiquidityList } from './LiquidityList';
 import { TokenBalances } from './TokenBalances';
+import { TransactionList } from './TransactionList';
 
 interface OrderTableProps {
   orders: RuneOrder[];
-  searchTerm: string;
+  searchTerm?: string;
   onDeleteOrder: (orderId: string) => Promise<void>;
   className?: string;
 }
 
-function OrderTable({ orders, title, type, searchTerm, onDeleteOrder, className, headerPosition = 'top', showColumnHeaders = false }: OrderTableProps & { headerPosition?: 'top' | 'bottom', title: string, type: 'ask' | 'bid', showColumnHeaders?: boolean }) {
-  const { balances } = useMain();
-
-  const hasEnoughBalance = (order: RuneOrder) => {
-    if (type === 'bid') return true;
-    const balance = balances.find(b => b.token === order.rune);
-    if (!balance) return false;
-    return +balance.amount >= +order.quantity;
-  };
-
+function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, className, headerPosition = 'top', showColumnHeaders = false }: OrderTableProps & { headerPosition?: 'top' | 'bottom', title: string, type: 'ask' | 'bid', showColumnHeaders?: boolean }) {
   const formatQuantity = (order: RuneOrder) => {
     const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
     if (!token) return order.quantity;
@@ -70,8 +60,8 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder, className,
                 <tr key={order.id} className={`hover:bg-gray-50 relative ${type === 'ask' ? 'flex' : ''}`}>
                   <td className="w-[35%] px-3 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <img src={token?.icon} alt={token?.symbol} className="w-5 h-5 rounded-full" />
-                      <span className="font-medium text-sm text-gray-900">{token?.symbol}</span>
+                      <img src={token?.icon || ''} alt={token?.symbol || ''} className="w-5 h-5 rounded-full" />
+                      <span className="font-medium text-sm text-gray-900">{token?.symbol || order.rune}</span>
                     </div>
                   </td>
                   <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm text-gray-900">
@@ -96,7 +86,7 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder, className,
                     <td
                       className="absolute inset-0 pointer-events-none"
                       style={{
-                        background: `linear-gradient(to right, ${type === 'ask' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(34, 197, 94, 0.05)'} ${progress}%, transparent ${progress}%)`
+                        background: `linear-gradient(to right, ${type === 'ask' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(34, 197, 94, 0.05)'} ${progress.toString()}%, transparent ${progress.toString()}%)`
                       }}
                     />
                   )}
@@ -121,20 +111,16 @@ function OrderTable({ orders, title, type, searchTerm, onDeleteOrder, className,
 export function OrderList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
-  const { orders, deleteOrder, refreshOrders, warnings, outputsHealth, balances } = useMain();
-  const [loading, setLoading] = useState(false);
+  const { orders, deleteOrder, refreshOrders, outputsHealth, balances } = useMain();
   const defaultToken = AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')?.name || null;
   const [selectedToken, setSelectedToken] = useState<string | null>(defaultToken);
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      setLoading(true);
       await deleteOrder(orderId);
       await refreshOrders();
     } catch (error) {
       console.error('Failed to delete order:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

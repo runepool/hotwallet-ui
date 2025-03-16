@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { RuneOrder, TokenBalance, OutputsHealth, AppWarning, WarningType } from '../types/api';
-import { getOrders, getTokenBalances, deleteOrder as apiDeleteOrder } from '../api/orders';
+import { getActiveOrders, getTokenBalances, deleteOrder as apiDeleteOrder } from '../api/orders';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { getApiClient } from '../services/api-provider';
 
@@ -105,7 +105,7 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   const refreshOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const newOrders = await getOrders();
+      const newOrders = await getActiveOrders();
       setOrders(newOrders);
       clearWarningsByType(WarningType.ORDER_ERROR);
     } catch (error) {
@@ -121,7 +121,7 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearWarningsByType, addWarning]);
 
   const refreshBalances = useCallback(async () => {
     if (isFetchingBalances) return;
