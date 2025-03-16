@@ -81,10 +81,10 @@ export function LiquidityList() {
       console.log('No outputsHealth data');
       return [];
     }
-    
+
     console.log('OutputsHealth:', outputsHealth);
-    
-    const entries = Object.entries(outputsHealth).filter(([asset]) => 
+
+    const entries = Object.entries(outputsHealth).filter(([asset]) =>
       asset === 'BTC' || AVAILABLE_TOKENS.some(t => t.name === asset)
     );
 
@@ -146,13 +146,13 @@ export function LiquidityList() {
           <tbody className="bg-white divide-y divide-gray-100">
             {supportedAssets.map(([token, outputs]) => {
               const balance = balances.find(b => b.token === token);
-              const tokenInfo = token === 'BTC' 
-                ? { 
-                    name: 'Bitcoin', 
-                    symbol: 'BTC', 
-                    decimals: 8, 
-                    icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'
-                  } 
+              const tokenInfo = token === 'BTC'
+                ? {
+                  name: 'Bitcoin',
+                  symbol: 'BTC',
+                  decimals: 8,
+                  icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'
+                }
                 : AVAILABLE_TOKENS.find(t => t.name === token);
 
               if (!tokenInfo) return null;
@@ -191,27 +191,26 @@ export function LiquidityList() {
                       <button
                         onClick={() => handleSplitClick(token, outputs)}
                         disabled={isProcessing}
-                        className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 ${
-                          hasLowLiquidity 
+                        className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 ${hasLowLiquidity
                             ? 'text-amber-700 bg-amber-100 hover:bg-amber-200'
                             : 'text-blue-700 bg-blue-100 hover:bg-blue-200'
-                        }`}
+                          }`}
                       >
                         {hasLowLiquidity && <AlertTriangle className="w-4 h-4 mr-1 text-amber-500" />}
                         <SplitSquareHorizontal className="w-4 h-4 mr-1" />
                         Split
                       </button>
-                      <button
+                      {/* <button
+                        disabled
                         onClick={() => handleOpenAutoSplitConfig(token)}
-                        className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 ${
-                          autoSplitConfigs[token]
+                        className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 ${autoSplitConfigs[token]
                             ? 'text-green-700 bg-green-100 hover:bg-green-200'
                             : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                        }`}
+                          }`}
                       >
                         <Settings className="w-4 h-4 mr-1" />
                         {autoSplitConfigs[token] ? 'Auto-Split On' : 'Auto-Split Off'}
-                      </button>
+                      </button> */}
                     </div>
                   </td>
                 </tr>

@@ -246,7 +246,7 @@ export function OrderList() {
           </div>
           
           <div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
-            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200" style={{ maxHeight: '450px' }}>
               <BatchOrderForm 
                 balances={balances} 
                 selectedToken={selectedToken}

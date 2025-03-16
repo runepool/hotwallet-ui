@@ -134,8 +134,8 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
   const selectedTokenInfo = selectableTokens.find(token => token.name === selectedToken);
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-gray-100 flex justify-between items-center">
+    <div className="h-full flex flex-col" >
+      <div className="p-3 border-b border-gray-100 flex justify-between items-center" >
         <h2 className="text-sm font-medium text-gray-900">Place Order</h2>
         <div className="inline-flex items-center gap-0.5 bg-gray-50 p-0.5 rounded-lg text-xs">
           <button

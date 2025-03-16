@@ -92,13 +92,13 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName, onConfigSaved
     }
   };
 
-  const token = assetName === 'BTC' 
-    ? { 
-        name: 'Bitcoin', 
-        symbol: 'BTC', 
-        decimals: 8, 
-        icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'
-      } 
+  const token = assetName === 'BTC'
+    ? {
+      name: 'Bitcoin',
+      symbol: 'BTC',
+      decimals: 8,
+      icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png'
+    }
     : AVAILABLE_TOKENS.find(t => t.name === assetName);
 
   if (!isOpen || !token) return null;
@@ -150,16 +150,15 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName, onConfigSaved
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-700">Enable Auto-Split</label>
                   <button
+                    disabled
                     type="button"
                     onClick={() => setNewConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 ${
-                      newConfig.enabled ? 'bg-yellow-500' : 'bg-gray-200'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 ${newConfig.enabled ? 'bg-yellow-500' : 'bg-gray-200'
+                      }`}
                   >
                     <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        newConfig.enabled ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${newConfig.enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
                     />
                   </button>
                 </div>
@@ -172,8 +171,8 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName, onConfigSaved
                     <input
                       type="number"
                       value={newConfig.split_size / Math.pow(10, token.decimals)}
-                      onChange={(e) => setNewConfig(prev => ({ 
-                        ...prev, 
+                      onChange={(e) => setNewConfig(prev => ({
+                        ...prev,
                         split_size: Math.floor((parseFloat(e.target.value) || 0) * Math.pow(10, token.decimals))
                       }))}
                       className="block w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 transition-all duration-200 bg-white shadow-sm"
@@ -209,7 +208,7 @@ export function AutoSplitConfigModal({ isOpen, onClose, assetName, onConfigSaved
                 <div className="p-4 bg-yellow-50 rounded-md">
                   <h4 className="text-sm font-medium text-yellow-800 mb-2">How it works</h4>
                   <p className="text-sm text-yellow-700">
-                    When enabled, your {token.symbol === 'BTC' ? 'BTC' : token.symbol} UTXOs will be automatically split into at least {token.symbol === 'BTC' ? 'sats' : token.symbol} split size. 
+                    When enabled, your {token.symbol === 'BTC' ? 'BTC' : token.symbol} UTXOs will be automatically split into at least {token.symbol === 'BTC' ? 'sats' : token.symbol} split size.
                     The system will ensure the transaction fee doesn't exceed the maximum cost.
                   </p>
                 </div>
