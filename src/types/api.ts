@@ -50,9 +50,7 @@ export interface Transaction {
 export interface UserSettings {
   bitcoinPrivateKey?: string;
   ordUrl: string;
-  nostrRelays: string[];
-  nostrPrivateKey: string;
-  nostrPublicKey?: string; // Derived from private key, read-only
+  websocketUrl: string;
 }
 
 export type OutputHealth = {
