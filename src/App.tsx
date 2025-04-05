@@ -5,30 +5,12 @@ import { Header } from './components/Header';
 import { OrderList } from './components/OrderList';
 import { MainProvider, useMain } from './context/MainContext';
 import { getApiClient } from './services/api-provider';
-import { WarningType } from './types/api';
-import { getPublicKey } from './utils/nostr';
-
-function getWarningColor(type: WarningType): string {
-  switch (type) {
-    case WarningType.LOW_LIQUIDITY:
-      return 'bg-yellow-100 border-yellow-400 text-yellow-800';
-    case WarningType.NETWORK_ERROR:
-    case WarningType.ORDER_ERROR:
-    case WarningType.BALANCE_ERROR:
-      return 'bg-red-100 border-red-400 text-red-800';
-    default:
-      return 'bg-gray-100 border-gray-400 text-gray-800';
-  }
-}
 
 function AppContent() {
   const [showConfig, setShowConfig] = useState(false);
   const [hasKeys, setHasKeys] = useState(false);
-  const [nostrPublicKey, setNostrPublicKey] = useState<string | null>(null);
   const { 
-    orders, 
     balances, 
-    loading, 
     error, 
     refreshBalances, 
     warnings,
@@ -41,7 +23,6 @@ function AppContent() {
       const hasRequiredKeys = !!settings.bitcoinPrivateKey;
       setHasKeys(hasRequiredKeys);
       setShowConfig(!hasRequiredKeys);
-      setNostrPublicKey(settings.nostrPublicKey!);
     } catch (error) {
       console.error('Failed to check keys:', error);
     }
@@ -55,13 +36,9 @@ function AppContent() {
     const handleSettingsUpdate = async () => {
       try {
         const settings = await getApiClient().getSettings();
-        if (settings.nostrPrivateKey) {
-          const pubKey = await getPublicKey(settings.nostrPrivateKey);
-          setNostrPublicKey(pubKey);
-        }
         setHasKeys(!!settings.bitcoinPrivateKey);
       } catch (error) {
-        console.error('Failed to load Nostr public key:', error);
+        console.error('Failed to load settings:', error);
       }
     };
 
@@ -72,7 +49,7 @@ function AppContent() {
   useEffect(() => {
     if (!hasKeys) return;
     refreshBalances();
-  }, [hasKeys]);
+  }, [hasKeys, refreshBalances]);
 
   const handleCloseConfig = () => {
     setShowConfig(false);
@@ -83,7 +60,6 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-100">
       <Header
-        nostrPublicKey={nostrPublicKey}
         error={error}
         balances={balances}
         showConfig={showConfig}
@@ -99,10 +75,19 @@ function AppContent() {
               className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3"
             >
               <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              <div className="flex-1 text-sm text-red-700">{warning.message}</div>
-              <button
+              <div className="flex-1">
+                <div className="font-medium text-red-800">{warning.message}</div>
+                {warning.data && (
+                  <div className="mt-1 text-sm text-red-700">
+                    {typeof warning.data === 'string' 
+                      ? warning.data 
+                      : JSON.stringify(warning.data, null, 2)}
+                  </div>
+                )}
+              </div>
+              <button 
                 onClick={() => clearWarning(warning.id)}
-                className="shrink-0 text-red-500 hover:text-red-700"
+                className="text-red-400 hover:text-red-600"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -120,21 +105,15 @@ function AppContent() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {showConfig ? (
-            <ConfigurationPage
-              autoGenerateNostr={!hasKeys}
-              onClose={handleCloseConfig}
-            />
-          ) : (
-            <>
-              {/* <BatchOrderForm balances={balances} /> */}
-              <OrderList />
-            </>
-          )}
-        </div>
-      </main>
+      <div className="container mx-auto px-4 py-8">
+        {showConfig ? (
+          <ConfigurationPage onClose={handleCloseConfig} />
+        ) : (
+          <div className="space-y-8">
+            <OrderList />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

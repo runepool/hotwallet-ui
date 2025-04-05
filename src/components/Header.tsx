@@ -1,32 +1,21 @@
-import React from 'react';
-import { Wallet, AlertCircle, Settings, Key } from 'lucide-react';
+import { Wallet, AlertCircle, Settings } from 'lucide-react';
 import { TokenBalance } from '../types/api';
 import { shortenAddress } from '../utils/format';
-import { formatPublicKey } from '../utils/nostr';
 
 interface HeaderProps {
-  nostrPublicKey: string | null;
   error: string | null;
   balances: TokenBalance[];
   showConfig: boolean;
   setShowConfig: (show: boolean) => void;
 }
 
-export function Header({ nostrPublicKey, error, balances, showConfig, setShowConfig }: HeaderProps) {
+export function Header({ error, balances, showConfig, setShowConfig }: HeaderProps) {
   return (
     <header className="bg-white shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-gray-900">RunePool</h1>
-            {nostrPublicKey && (
-              <div className="flex items-center gap-1.5 bg-purple-50 px-2 py-1 rounded-md">
-                <Key className="w-3.5 h-3.5 text-purple-500" />
-                <span className="text-purple-700 font-medium text-xs">
-                  npub: {formatPublicKey(nostrPublicKey)}
-                </span>
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-3">
             {error ? (
