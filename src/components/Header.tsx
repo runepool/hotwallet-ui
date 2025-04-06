@@ -30,7 +30,7 @@ export function Header({ error, balances, showConfig, setShowConfig, onLogout }:
                   <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-md min-w-0">
                     <Wallet className="w-4 h-4 text-blue-500 flex-shrink-0" />
                     <span className="text-blue-700 font-medium text-sm truncate">
-                      {shortenAddress(balances.find(b => b.token === 'BTC')?.address || '')}
+                      {balances.find(b => b.token === 'BTC')?.address || ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
