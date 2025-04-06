@@ -3,6 +3,8 @@ import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, T
 import { AVAILABLE_TOKENS } from '../constants/runes';
 
 export class MockApiClient implements ApiClient {
+  private hasPassword = false;
+  private bitcoinPrivateKey: string | null = null;
   private orders: RuneOrder[] = [
     {
       id: '1',
@@ -52,10 +54,11 @@ export class MockApiClient implements ApiClient {
   ];
 
   private tokenBalances: TokenBalance[] = AVAILABLE_TOKENS.map(token => ({
-    symbol: token.symbol,
+    token: token.symbol,
     balance: (Math.random() * (token.symbol === 'BTC' ? 1 : 1000)).toFixed(token.decimals),
-    walletAddress: `bc1${Array(40).fill(0).map(() => 
-      '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')}`
+    address: `bc1${Array(40).fill(0).map(() => 
+      '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')}`,
+    decimals: token.decimals
   }));
 
   async createOrder(order: CreateRuneOrderDto): Promise<void> {
@@ -133,7 +136,7 @@ export class MockApiClient implements ApiClient {
 
   private updateBalances(): void {
     this.tokenBalances = this.tokenBalances.map(balance => {
-      const token = AVAILABLE_TOKENS.find(t => t.symbol === balance.symbol);
+      const token = AVAILABLE_TOKENS.find(t => t.symbol === balance.token);
       if (!token) return balance;
 
       const currentBalance = parseFloat(balance.balance);
@@ -153,7 +156,7 @@ export class MockApiClient implements ApiClient {
       if (tx.status === TransactionStatus.CONFIRMING && Math.random() < 0.2) {
         return {
           ...tx,
-          status: Math.random() < 0.9 ? TransactionStatus.CONFIRMED : TransactionStatus.FAILED,
+          status: Math.random() < 0.9 ? TransactionStatus.CONFIRMED : TransactionStatus.ERRORED,
           updatedAt: new Date().toISOString()
         };
       }
@@ -182,5 +185,163 @@ export class MockApiClient implements ApiClient {
 
     // Keep only the last 10 transactions
     this.transactions = this.transactions.slice(0, 10);
+  }
+
+  // Password management methods
+  async getWalletAddress(): Promise<string> {
+    await this.delay(300);
+    return 'bc1qmockwalletaddress123456789abcdefg';
+  }
+
+  async setupPassword(password: string, bitcoinPrivateKey?: string, oldPassword?: string): Promise<void> {
+    await this.delay(500);
+    
+    // If we have a password set and we're changing it, validate old password
+    if (this.hasPassword && !oldPassword) {
+      throw new Error('Old password is required when changing password');
+    }
+    
+    // In a real implementation, we would use the password to encrypt the private key
+    // For the mock, we just validate it's not empty
+    if (!password) {
+      throw new Error('Password cannot be empty');
+    }
+    
+    // Store the bitcoin private key if provided
+    if (bitcoinPrivateKey) {
+      this.bitcoinPrivateKey = bitcoinPrivateKey;
+    }
+    
+    // Set the password flag
+    this.hasPassword = true;
+    
+    console.log('Password setup successful with password:', password.substring(0, 1) + '*'.repeat(password.length - 1));
+  }
+
+  async unlockWallet(password: string): Promise<boolean> {
+    await this.delay(300);
+    
+    // In mock implementation, always return true unless empty password
+    if (!password) {
+      return false;
+    }
+    
+    return true;
+  }
+  
+  async isLoggedIn(): Promise<boolean> {
+    await this.delay(200);
+    // In mock implementation, return the hasPassword flag
+    return this.hasPassword;
+  }
+  
+  async logout(): Promise<boolean> {
+    await this.delay(200);
+    // In mock implementation, reset the password state
+    this.hasPassword = false;
+    return true;
+  }
+
+  async hasWalletConfiguration(): Promise<boolean> {
+    await this.delay(200);
+    return this.bitcoinPrivateKey !== null;
+  }
+  
+  async getSettings(): Promise<any> {
+    await this.delay(300);
+    return {
+      bitcoinPrivateKey: this.bitcoinPrivateKey ? 'xxx' : '',
+      ordUrl: 'http://localhost:8080',
+      websocketUrl: 'wss://ws.runepool.io',
+      hasPassword: this.hasPassword
+    };
+  }
+  
+  async updateSettings(settings: any): Promise<void> {
+    await this.delay(300);
+    // Mock implementation - just log the settings update
+    console.log('Settings updated:', settings);
+  }
+  
+  async deleteOrder(orderId: string): Promise<void> {
+    await this.delay(300);
+    const index = this.orders.findIndex(o => o.id === orderId);
+    if (index !== -1) {
+      this.orders.splice(index, 1);
+    }
+  }
+  
+  async getLiquidityHealth(): Promise<any> {
+    await this.delay(300);
+    return {
+      totalOutputs: 25,
+      availableOutputs: 18,
+      reservedOutputs: 7,
+      status: 'healthy'
+    };
+  }
+  
+  async splitAsset(): Promise<void> {
+    await this.delay(500);
+    console.log('Asset split requested');
+  }
+  
+  async setAutoSplitConfig(): Promise<void> {
+    await this.delay(300);
+    console.log('Auto split config set');
+  }
+  
+  async getAutoSplitConfig(): Promise<any> {
+    await this.delay(300);
+    return {
+      assetName: 'DOG',
+      enabled: true,
+      threshold: 5,
+      targetCount: 10
+    };
+  }
+  
+  async getAllAutoSplitConfigs(): Promise<any[]> {
+    await this.delay(300);
+    return [
+      {
+        assetName: 'DOG',
+        enabled: true,
+        threshold: 5,
+        targetCount: 10
+      },
+      {
+        assetName: 'LIQUIDIUM',
+        enabled: false,
+        threshold: 3,
+        targetCount: 8
+      }
+    ];
+  }
+  
+  async deleteAutoSplitConfig(): Promise<void> {
+    await this.delay(300);
+    console.log('Auto split config deleted');
+  }
+  
+  async updateAutoRebalancing(): Promise<void> {
+    await this.delay(300);
+    console.log('Auto rebalancing updated');
+  }
+  
+  async getAutoRebalancing(): Promise<any> {
+    await this.delay(300);
+    return {
+      enabled: true,
+      spread: '0.5'
+    };
+  }
+  
+  async getActiveOrders(asset?: string): Promise<RuneOrder[]> {
+    await this.delay(300);
+    if (asset) {
+      return this.orders.filter(o => o.rune === asset);
+    }
+    return [...this.orders];
   }
 }

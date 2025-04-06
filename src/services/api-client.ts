@@ -1,6 +1,15 @@
 import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest, AutoSplitConfig, AutoRebalancingSettings } from '../types/api';
 
 export interface ApiClient {
+  // Password management
+  getWalletAddress(): Promise<string>;
+  setupPassword(password: string, bitcoinPrivateKey?: string, oldPassword?: string): Promise<void>;
+  unlockWallet(password: string): Promise<boolean>;
+  isLoggedIn(): Promise<boolean>;
+  logout(): Promise<boolean>;
+  hasWalletConfiguration(): Promise<boolean>;
+  
+  // Existing methods
   createOrder(order: CreateRuneOrderDto): Promise<void>;
   getOrders(): Promise<RuneOrder[]>;
   getActiveOrders(asset?: string): Promise<RuneOrder[]>;
@@ -26,23 +35,70 @@ export interface ApiClient {
 
 export class HttpApiClient implements ApiClient {
   private baseUrl: string;
+  private password: string | null = null;
   
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+  
+  async getWalletAddress(): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/account/address`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to get wallet address');
+    }
+    
+    try {
+      const data = await response.json();
+      return data.address;
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+      throw new Error('Failed to parse wallet address data');
+    }
+  }
+  
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (this.password) {
+      headers['X-Password'] = this.password;
+    }
+    
+    return headers;
   }
 
   async createOrder(order: CreateRuneOrderDto): Promise<void> {
     const response = await fetch(`${this.baseUrl}/orders`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(order),
     });
-    if (!response.ok) throw new Error('Failed to create order');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to create order');
+    }
   }
 
   async getOrders(): Promise<RuneOrder[]> {
-    const response = await fetch(`${this.baseUrl}/orders`);
-    if (!response.ok) throw new Error('Failed to fetch orders');
+    const response = await fetch(`${this.baseUrl}/orders`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to fetch orders');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -53,8 +109,15 @@ export class HttpApiClient implements ApiClient {
 
   async getActiveOrders(asset?: string): Promise<RuneOrder[]> {
     const params = asset ? `?asset=${asset}` : '';
-    const response = await fetch(`${this.baseUrl}/orders/active${params}`);
-    if (!response.ok) throw new Error('Failed to fetch active orders');
+    const response = await fetch(`${this.baseUrl}/orders/active${params}`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to fetch active orders');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -64,8 +127,15 @@ export class HttpApiClient implements ApiClient {
   }
 
   async getOrderById(orderId: string): Promise<RuneOrder> {
-    const response = await fetch(`${this.baseUrl}/orders/${orderId}`);
-    if (!response.ok) throw new Error('Order not found');
+    const response = await fetch(`${this.baseUrl}/orders/${orderId}`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to fetch order');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -77,15 +147,27 @@ export class HttpApiClient implements ApiClient {
   async createBatchOrders(orders: CreateBatchRuneOrderDto): Promise<void> {
     const response = await fetch(`${this.baseUrl}/orders/batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(orders),
     });
-    if (!response.ok) throw new Error('Failed to create batch orders');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to create batch orders');
+    }
   }
 
   async getTokenBalances(): Promise<TokenBalance[]> {
-    const response = await fetch(`${this.baseUrl}/account/balance`);
-    if (!response.ok) throw new Error('Failed to fetch token balances');
+    const response = await fetch(`${this.baseUrl}/account/balance`, {
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to fetch token balances');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -95,7 +177,9 @@ export class HttpApiClient implements ApiClient {
   }
 
   async getTransactions(): Promise<Transaction[]> {
-    const response = await fetch(`${this.baseUrl}/transactions`);
+    const response = await fetch(`${this.baseUrl}/transactions`, {
+      headers: this.getHeaders()
+    });
     if (!response.ok) throw new Error('Failed to fetch transactions');
     try {
       return await response.json();
@@ -106,7 +190,9 @@ export class HttpApiClient implements ApiClient {
   }
 
   async getSettings(): Promise<UserSettings> {
-    const response = await fetch(`${this.baseUrl}/settings`);
+    const response = await fetch(`${this.baseUrl}/settings`, {
+      headers: this.getHeaders()
+    });
     if (!response.ok) throw new Error('Failed to fetch settings');
     try {
       return await response.json();
@@ -119,14 +205,21 @@ export class HttpApiClient implements ApiClient {
   async updateSettings(settings: UserSettings): Promise<void> {
     const response = await fetch(`${this.baseUrl}/settings`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(settings),
     });
-    if (!response.ok) throw new Error('Failed to update settings');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to update settings');
+    }
   }
 
   async getPendingTransactions(): Promise<Transaction[]> {
-    const response = await fetch(`${this.baseUrl}/pending-transactions`);
+    const response = await fetch(`${this.baseUrl}/pending-transactions`, {
+      headers: this.getHeaders()
+    });
     if (!response.ok) throw new Error('Failed to fetch pending transactions');
     try {
       return await response.json();
@@ -137,8 +230,15 @@ export class HttpApiClient implements ApiClient {
   }
 
   async getPendingTransactionById(id: string): Promise<Transaction> {
-    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch pending transaction');
+    const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to fetch pending transaction');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -150,26 +250,39 @@ export class HttpApiClient implements ApiClient {
   async deletePendingTransaction(id: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/pending-transactions/${id}`, {
       method: 'DELETE',
+      headers: this.getHeaders()
     });
-    if (!response.ok) throw new Error('Failed to delete pending transaction');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to delete pending transaction');
+    }
   }
 
   async deleteOrder(orderId: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/orders/${orderId}`, {
       method: 'DELETE',
+      headers: this.getHeaders()
     });
-    if (!response.ok) throw new Error('Failed to delete order');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to delete order');
+    }
   }
 
   async getLiquidityHealth(): Promise<OutputsHealth> {
     const response = await fetch(`${this.baseUrl}/account/liquidity-health`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getHeaders(),
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
       throw new Error(`Failed to get liquidity health: ${response.statusText}`);
     }
 
@@ -184,13 +297,14 @@ export class HttpApiClient implements ApiClient {
   async splitAsset(request: SplitAssetRequest): Promise<void> {
     const response = await fetch(`${this.baseUrl}/account/split-asset`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getHeaders(),
       body: JSON.stringify(request),
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
       throw new Error(`Failed to split asset: ${response.statusText}`);
     }
   }
@@ -198,15 +312,27 @@ export class HttpApiClient implements ApiClient {
   async setAutoSplitConfig(config: AutoSplitConfig): Promise<void> {
     const response = await fetch(`${this.baseUrl}/account/auto-split`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(config),
     });
-    if (!response.ok) throw new Error('Failed to set auto-split configuration');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to set auto-split configuration');
+    }
   }
 
   async getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig> {
-    const response = await fetch(`${this.baseUrl}/account/auto-split/${assetName}`);
-    if (!response.ok) throw new Error('Failed to get auto-split configuration');
+    const response = await fetch(`${this.baseUrl}/account/auto-split/${assetName}`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to get auto-split configuration');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -216,8 +342,15 @@ export class HttpApiClient implements ApiClient {
   }
 
   async getAllAutoSplitConfigs(): Promise<AutoSplitConfig[]> {
-    const response = await fetch(`${this.baseUrl}/account/auto-split`);
-    if (!response.ok) throw new Error('Failed to get auto-split configurations');
+    const response = await fetch(`${this.baseUrl}/account/auto-split`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to get auto-split configurations');
+    }
     try {
       return await response.json();
     } catch (error) {
@@ -229,29 +362,45 @@ export class HttpApiClient implements ApiClient {
   async deleteAutoSplitConfig(assetName: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/auto-split/${assetName}`, {
       method: 'DELETE',
+      headers: this.getHeaders()
     });
-    if (!response.ok) throw new Error('Failed to delete auto-split config');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to delete auto-split config');
+    }
   }
 
   async updateAutoRebalancing(asset: string, settings: AutoRebalancingSettings): Promise<void> {
     const response = await fetch(`${this.baseUrl}/rebalance/${asset}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify({
         assetName: asset,
         enabled: settings.enabled,
         spread: settings.spread
       }),
     });
-    if (!response.ok) throw new Error('Failed to update auto-rebalancing settings');
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to update auto-rebalancing settings');
+    }
   }
 
   async getAutoRebalancing(asset: string): Promise<AutoRebalancingSettings> {
-    const response = await fetch(`${this.baseUrl}/rebalance/${asset}`);
+    const response = await fetch(`${this.baseUrl}/rebalance/${asset}`, {
+      headers: this.getHeaders()
+    });
     if (!response.ok) {
       if (response.status === 404) {
         // Return default settings if configuration doesn't exist yet
         return { enabled: false, spread: '0.5' };
+      }
+      if (response.status === 401) {
+        throw new Error('Invalid password');
       }
       throw new Error('Failed to fetch auto-rebalancing settings');
     }
@@ -264,6 +413,145 @@ export class HttpApiClient implements ApiClient {
     } catch (error) {
       console.error('Failed to parse JSON response:', error);
       throw new Error('Failed to parse auto-rebalancing settings data');
+    }
+  }
+
+  /**
+   * Sets up or changes the password for the Bitcoin private key
+   * @param password The new password to use
+   * @param bitcoinPrivateKey Optional Bitcoin private key to set during password setup
+   * @param oldPassword Optional old password, required when changing an existing password
+   */
+  async setupPassword(password: string, bitcoinPrivateKey?: string, oldPassword?: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/settings/password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        password,
+        bitcoinPrivateKey,
+        oldPassword
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to set up password: ${errorText}`);
+    }
+  }
+  
+  /**
+   * Validates a password by attempting to unlock the wallet
+   * @param password The password to validate
+   * @returns Promise resolving to true if password is valid, false otherwise
+   */
+  async unlockWallet(password: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/settings/unlock`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+      
+      if (!response.ok) {
+        // If we get a 401, it means the password is invalid
+        if (response.status === 401) {
+          return false;
+        }
+        throw new Error('Failed to validate password');
+      }
+      
+      // Store the password for future authenticated requests
+      this.password = password;
+      return true;
+    } catch (error) {
+      console.error('Error validating password:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Checks if the user is currently logged in without requiring password entry
+   * @returns Promise resolving to true if logged in, false otherwise
+   */
+  async isLoggedIn(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/account/isLoggedIn`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        return false;
+      }
+      
+      const data = await response.json();
+      return data.isLoggedIn;
+    } catch (error) {
+      console.error('Error checking login status:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Logs the user out by clearing wallet data from memory
+   * @returns Promise resolving to true if logout was successful
+   */
+  async logout(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/account/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        return false;
+      }
+      
+      // Clear the stored password
+      this.password = null;
+      
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error during logout:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Checks if the wallet has been configured with a Bitcoin private key
+   * @returns Promise resolving to true if wallet is configured, false otherwise
+   */
+  async hasWalletConfiguration(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/settings`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        // If we get a 401, it means there's a key but it's password protected
+        if (response.status === 401) {
+          return true;
+        }
+        return false;
+      }
+      
+      const settings = await response.json();
+      return !!settings.bitcoinPrivateKey;
+    } catch (error) {
+      // If there's an error, assume no configuration
+      return false;
     }
   }
 }

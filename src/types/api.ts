@@ -51,6 +51,8 @@ export interface UserSettings {
   bitcoinPrivateKey?: string;
   ordUrl: string;
   websocketUrl: string;
+  hasPassword?: boolean;
+  password?: string; // Used for authentication when updating settings
 }
 
 export type OutputHealth = {

@@ -3,30 +3,80 @@ import { useEffect, useMemo, useState } from 'react';
 import { ConfigurationPage } from './components/ConfigurationPage';
 import { Header } from './components/Header';
 import { OrderList } from './components/OrderList';
+import { PasswordScreen } from './components/PasswordScreen';
 import { MainProvider, useMain } from './context/MainContext';
 import { getApiClient } from './services/api-provider';
 
 function AppContent() {
   const [showConfig, setShowConfig] = useState(false);
   const [hasKeys, setHasKeys] = useState(false);
+  const [initialSetup, setInitialSetup] = useState(true);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
   const { 
     balances, 
     error, 
     refreshBalances, 
     warnings,
-    clearWarning
+    clearWarning,
+    isWalletLocked,
+    hasPassword,
+    logout
   } = useMain();
 
   const checkKeys = useMemo(() => async () => {
     try {
+      console.log('Checking wallet configuration...');
+      // First check if we have wallet configuration at all
+      const hasConfig = await getApiClient().hasWalletConfiguration();
+      
+      if (!hasConfig) {
+        console.log('No wallet configuration - showing initial password setup');
+        // No configuration at all - needs initial password setup
+        setNeedsPasswordSetup(true);
+        setHasKeys(false);
+        setInitialSetup(false);
+        return;
+      }
+      
+      // If we have configuration, check settings
       const settings = await getApiClient().getSettings();
       const hasRequiredKeys = !!settings.bitcoinPrivateKey;
       setHasKeys(hasRequiredKeys);
-      setShowConfig(!hasRequiredKeys);
+      
+      console.log('Wallet status:', { 
+        hasConfig, 
+        hasRequiredKeys, 
+        hasPassword, 
+        isWalletLocked 
+      });
+      
+      // Check if we need password setup
+      if (!hasPassword && !hasRequiredKeys) {
+        // No password and no keys - needs initial password setup
+        console.log('No password and no keys - showing password setup');
+        setNeedsPasswordSetup(true);
+      } else if (!hasRequiredKeys) {
+        // Has password but no keys - show config screen
+        console.log('Has password but no keys - showing config screen');
+        setShowConfig(true);
+      }
+      
+      // We've completed initial checks
+      setInitialSetup(false);
     } catch (error) {
-      console.error('Failed to check keys:', error);
+      if (error instanceof Error && error.message.includes('Password required')) {
+        // If we get a password required error, the wallet is locked
+        console.log('Password required error - wallet is locked');
+        setInitialSetup(false);
+      } else {
+        console.error('Failed to check keys:', error);
+        // For other errors, we still need to move past initial setup
+        setInitialSetup(false);
+        // Show password setup for any other error
+        setNeedsPasswordSetup(true);
+      }
     }
-  }, []);
+  }, [hasPassword, isWalletLocked]);
 
   useEffect(() => {
     checkKeys();
@@ -47,9 +97,11 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!hasKeys) return;
-    refreshBalances();
-  }, [hasKeys, refreshBalances]);
+    if (!hasKeys || isWalletLocked) return;
+    if(refreshBalances) {
+      refreshBalances();
+    }
+  }, [hasKeys, isWalletLocked]);
 
   const handleCloseConfig = () => {
     setShowConfig(false);
@@ -57,14 +109,52 @@ function AppContent() {
     refreshBalances();
   };
 
+  const handleUnlockWallet = () => {
+    // After password setup is complete, check if we need to show the config screen
+    setInitialSetup(false);
+    setNeedsPasswordSetup(false);
+    
+    // Check if we need to show the configuration screen
+    if (!hasKeys) {
+      setShowConfig(true);
+    }
+    refreshBalances();
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
-      <Header
-        error={error}
-        balances={balances}
-        showConfig={showConfig}
-        setShowConfig={setShowConfig}
-      />
+      {/* Show password setup screen if needed */}
+      {needsPasswordSetup ? (
+        <PasswordScreen 
+          onUnlock={handleUnlockWallet} 
+          isInitialSetup={true}
+        />
+      ) : isWalletLocked && hasKeys ? (
+        <PasswordScreen 
+          onUnlock={handleUnlockWallet} 
+          isInitialSetup={false}
+        />
+      ) : initialSetup ? (
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : (
+        <>
+          <Header
+            error={error}
+            balances={balances}
+            showConfig={showConfig}
+            setShowConfig={setShowConfig}
+            onLogout={async () => {
+              const success = await logout();
+              if (success) {
+                // After logout, we need to show the password screen
+                setNeedsPasswordSetup(false);
+                // We don't need to reset hasKeys since the wallet data is still there
+                // just locked
+              }
+            }}
+          />
 
       {/* Warnings */}
       {warnings.filter(w => w.type !== 'LOW_LIQUIDITY').length > 0 && (
@@ -114,6 +204,8 @@ function AppContent() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

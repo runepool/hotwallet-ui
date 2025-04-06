@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { RuneOrder, TokenBalance, OutputsHealth, AppWarning, WarningType } from '../types/api';
-import { getActiveOrders, getTokenBalances, deleteOrder as apiDeleteOrder } from '../api/orders';
+import { getActiveOrders, deleteOrder as apiDeleteOrder } from '../api/orders';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { getApiClient } from '../services/api-provider';
 
@@ -20,6 +20,13 @@ interface MainContextType {
   clearWarningsByType: (type: WarningType) => void;
   addOrder: (order: RuneOrder) => Promise<void>;
   apiClient: ReturnType<typeof getApiClient>;
+  // Password and wallet locking functionality
+  isWalletLocked: boolean;
+  lockWallet: () => void;
+  unlockWallet: (password: string) => Promise<boolean>;
+  logout: () => Promise<boolean>;
+  setupPassword: (password: string, bitcoinPrivateKey?: string, oldPassword?: string) => Promise<boolean>;
+  hasPassword: boolean;
 }
 
 const MainContext = createContext<MainContextType | undefined>(undefined);
@@ -29,9 +36,11 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   const [balances, setBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFetchingBalances, setIsFetchingBalances] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [outputsHealth, setOutputsHealth] = useState<OutputsHealth | null>(null);
   const [warnings, setWarnings] = useState<AppWarning[]>([]);
+  const [isWalletLocked, setIsWalletLocked] = useState(true);
+  const [hasPassword, setHasPassword] = useState(false);
   const refreshingHealth = useRef(false);
   const apiClient = getApiClient();
 
@@ -74,10 +83,70 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Check if wallet has a password set and if user is logged in
+  useEffect(() => {
+    const checkPasswordStatus = async () => {
+      try {
+        // First check if user is already logged in
+        const isLoggedIn = await apiClient.isLoggedIn();
+        if (isLoggedIn) {
+          console.log('User is already logged in');
+          setIsWalletLocked(false);
+          setHasPassword(true);
+          return;
+        }
+        
+        // If not logged in, check if there's a wallet configuration
+        const hasConfig = await apiClient.hasWalletConfiguration();
+        if (!hasConfig) {
+          // No configuration at all - needs initial setup
+          console.log('No wallet configuration found - needs initial setup');
+          setHasPassword(false);
+          setIsWalletLocked(false); // Don't lock the wallet for initial setup
+          return;
+        }
+        
+        // If there is configuration, check if it has an encrypted key and password
+        const settings = await apiClient.getSettings();
+        console.log('Wallet settings:', { 
+          hasKey: !!settings.bitcoinPrivateKey, 
+          hasPassword: settings.hasPassword 
+        });
+        
+        // Use the hasPassword field from settings
+        setHasPassword(!!settings.hasPassword);
+        
+        // If we have a password, the wallet is locked until unlocked
+        if (settings.hasPassword) {
+          console.log('Wallet has password - locked until unlocked');
+          setIsWalletLocked(true);
+        } else {
+          // We have configuration but no password - needs password setup
+          console.log('Wallet has configuration but no password - needs setup');
+          setIsWalletLocked(false);
+        }
+      } catch (error) {
+        // If we get a password required error, it means the key is encrypted
+        if (error instanceof Error && error.message.includes('Password required')) {
+          console.log('Password required error - wallet is locked');
+          setHasPassword(true);
+          setIsWalletLocked(true);
+        } else {
+          console.error('Failed to check password status:', error);
+          // For other errors, assume we need initial setup
+          setHasPassword(false);
+          setIsWalletLocked(false);
+        }
+      }
+    };
+    
+    checkPasswordStatus();
+  }, [apiClient]);
+
   useEffect(() => {
     let mounted = true;
     const pollData = async () => {
-      if (!mounted) return;
+      if (!mounted || isWalletLocked) return;
       
       try {
         await Promise.all([
@@ -87,20 +156,28 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
         ]);
       } catch (error) {
         console.error('Polling error:', error);
+        
+        // If we get a password required error, lock the wallet
+        if (error instanceof Error && error.message.includes('Password required')) {
+          setIsWalletLocked(true);
+        }
       }
     };
 
-    // Initial load
-    pollData();
+    // Only start polling if wallet is unlocked
+    if (!isWalletLocked) {
+      // Initial load
+      pollData();
 
-    // Set up polling
-    const interval = setInterval(pollData, 5000);
+      // Set up polling
+      const interval = setInterval(pollData, 5000);
 
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+      return () => {
+        mounted = false;
+        clearInterval(interval);
+      };
+    }
+  }, [isWalletLocked]);
 
   const refreshOrders = useCallback(async () => {
     setLoading(true);
@@ -124,11 +201,11 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
   }, [clearWarningsByType, addWarning]);
 
   const refreshBalances = useCallback(async () => {
-    if (isFetchingBalances) return;
+    if (isFetchingBalances || isWalletLocked) return;
 
     try {
       setIsFetchingBalances(true);
-      const data = await getTokenBalances();
+      const data = await apiClient.getTokenBalances();
       const scaledBalances = data
         .map(balance => {
           let token = AVAILABLE_TOKENS.find(t => t.name === balance.token);
@@ -148,8 +225,16 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Failed to fetch balances:', err);
       
+      // Check if this is a password error
+      if (err instanceof Error && err.message.includes('Invalid password')) {
+        setIsWalletLocked(true);
+        addWarning(
+          WarningType.BALANCE_ERROR,
+          'Invalid password. Please unlock your wallet.'
+        );
+      }
       // Only show the error warning if it's not a JSON parsing error
-      if (!(err instanceof Error && err.message.includes('parse'))) {
+      else if (!(err instanceof Error && err.message.includes('parse'))) {
         addWarning(
           WarningType.BALANCE_ERROR,
           'Unable to connect to server. Please ensure the API is running.'
@@ -158,11 +243,11 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsFetchingBalances(false);
     }
-  }, [isFetchingBalances]);
+  }, [isFetchingBalances, isWalletLocked]);
 
   const refreshHealth = useCallback(async () => {
-    // Prevent concurrent refreshes
-    if (refreshingHealth.current) {
+    // Prevent concurrent refreshes or if wallet is locked
+    if (refreshingHealth.current || isWalletLocked) {
       return;
     }
     
@@ -177,8 +262,16 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to fetch liquidity health:', error);
       
+      // Check if this is a password error
+      if (error instanceof Error && error.message.includes('Invalid password')) {
+        setIsWalletLocked(true);
+        addWarning(
+          WarningType.NETWORK_ERROR,
+          'Invalid password. Please unlock your wallet.'
+        );
+      }
       // Only show the network error warning if it's not a JSON parsing error
-      if (error instanceof Error && error.message !== 'Failed to parse liquidity health data') {
+      else if (error instanceof Error && error.message !== 'Failed to parse liquidity health data') {
         addWarning(
           WarningType.NETWORK_ERROR,
           'Unable to connect to server. Please ensure the API is running.'
@@ -187,7 +280,7 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     } finally {
       refreshingHealth.current = false;
     }
-  }, [addWarning, clearWarningsByType]);
+  }, [addWarning, clearWarningsByType, isWalletLocked]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     try {
@@ -235,6 +328,55 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     }
   }, [apiClient, refreshOrders, clearWarningsByType, addWarning]);
 
+  // Wallet locking and unlocking functions
+  const lockWallet = useCallback(() => {
+    setIsWalletLocked(true);
+  }, []);
+
+  const unlockWallet = useCallback(async (password: string): Promise<boolean> => {
+    try {
+      await apiClient.unlockWallet(password);
+      // Test the password by trying to get the wallet address
+      await apiClient.getWalletAddress();
+      setIsWalletLocked(false);
+      return true;
+    } catch (error) {
+      console.error('Failed to unlock wallet:', error);
+      return false;
+    }
+  }, [apiClient]);
+  
+  // Logout function
+  const logout = useCallback(async (): Promise<boolean> => {
+    try {
+      const success = await apiClient.logout();
+      if (success) {
+        setIsWalletLocked(true);
+        // Clear any sensitive data from the context
+        setOrders([]);
+        setBalances([]);
+        setOutputsHealth(null);
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to logout:', error);
+      return false;
+    }
+  }, [apiClient]);
+
+  // Setup or change password
+  const setupPassword = useCallback(async (password: string, bitcoinPrivateKey?: string, oldPassword?: string): Promise<boolean> => {
+    try {
+      await apiClient.setupPassword(password, bitcoinPrivateKey, oldPassword);
+      setHasPassword(true);
+      setIsWalletLocked(false);
+      return true;
+    } catch (error) {
+      console.error('Failed to set up password:', error);
+      return false;
+    }
+  }, [apiClient]);
+
   const value = {
     orders,
     balances,
@@ -250,7 +392,14 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     clearWarning,
     clearWarningsByType,
     addOrder,
-    apiClient
+    apiClient,
+    // Password and wallet locking functionality
+    isWalletLocked,
+    lockWallet,
+    unlockWallet,
+    logout,
+    setupPassword,
+    hasPassword
   };
 
   return (
