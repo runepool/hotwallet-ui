@@ -19,13 +19,13 @@ export const AVAILABLE_TOKENS: TokenInfo[] = [
     decimals: 5
   },
   {
-    symbol: 'LIQUIDIUM',
-    name: 'LIQUIDIUM•TOKEN',
-    icon: 'https://img-cdn.magiceden.dev/rs:fill:128:0:0/plain/https%3A%2F%2Fbafybeigysekcnztzug5cg4nmm4m3kimrudptuyxyv7cbsrdhpu57ok5fty.ipfs.w3s.link%2FToken%2520Symbol%25201024x.png',
+    symbol: 'RNP',
+    name: 'RUNE•POOL•TOKEN',
+    icon: 'https://ord.runepool.org/preview/06d3e90d5df1efe962d4bf2bf2be1e5fdb6fb697948e5628fb95bc5bc220a088i0',
     metadata: {
-      description: 'Liquidium is a decentralized liquidity protocol for Bitcoin Runes'
+      description: 'Much wow, such coin'
     },
-    decimals: 2
+    decimals: 5
   }
 ];
 
