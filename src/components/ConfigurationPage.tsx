@@ -12,7 +12,7 @@ export function ConfigurationPage({ onClose }: ConfigurationPageProps) {
   const [config, setConfig] = useState<UserSettings>({
     bitcoinPrivateKey: '',
     ordUrl: 'https://ord.runepool.io',
-    websocketUrl: 'wss://ws.runepool.io'
+    websocketUrl: 'wss://ws.runepool.org'
   });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);

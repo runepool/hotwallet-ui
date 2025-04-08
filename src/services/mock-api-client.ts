@@ -252,7 +252,7 @@ export class MockApiClient implements ApiClient {
     return {
       bitcoinPrivateKey: this.bitcoinPrivateKey ? 'xxx' : '',
       ordUrl: 'http://localhost:8080',
-      websocketUrl: 'wss://ws.runepool.io',
+      websocketUrl: 'wss://ws.runepool.org',
       hasPassword: this.hasPassword
     };
   }
