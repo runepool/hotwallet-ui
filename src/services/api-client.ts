@@ -24,7 +24,7 @@ export interface ApiClient {
   deletePendingTransaction(id: string): Promise<void>;
   deleteOrder(orderId: string): Promise<void>;
   getLiquidityHealth(): Promise<OutputsHealth>;
-  splitAsset(request: SplitAssetRequest): Promise<void>;
+  splitAsset(request: SplitAssetRequest): Promise<{ success: boolean; txid?: string; error?: string }>;
   setAutoSplitConfig(config: AutoSplitConfig): Promise<void>;
   getAutoSplitConfig(assetName: string): Promise<AutoSplitConfig>;
   getAllAutoSplitConfigs(): Promise<AutoSplitConfig[]>;
@@ -294,19 +294,28 @@ export class HttpApiClient implements ApiClient {
     }
   }
 
-  async splitAsset(request: SplitAssetRequest): Promise<void> {
+  async splitAsset(request: SplitAssetRequest): Promise<{ success: boolean; txid?: string; error?: string }> {
     const response = await fetch(`${this.baseUrl}/account/split-asset`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(request),
     });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Invalid password');
-      }
-      throw new Error(`Failed to split asset: ${response.statusText}`);
+    // Parse the response JSON regardless of status code
+    const data = await response.json();
+
+    // Check for authentication errors
+    if (response.status === 401) {
+      throw new Error('Invalid password');
     }
+
+    // If the API returns an error message, throw it
+    if (!response.ok || data.error) {
+      throw new Error(data.error || `Failed to split asset: ${response.statusText}`);
+    }
+
+    // Return the success response
+    return { success: true, txid: data.txid };
   }
 
   async setAutoSplitConfig(config: AutoSplitConfig): Promise<void> {

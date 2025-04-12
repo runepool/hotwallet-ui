@@ -26,6 +26,10 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
     price: '',
     type: 'ask',
   });
+  
+  // Formatted display values for inputs
+  const [formattedQuantity, setFormattedQuantity] = useState('');
+  const [formattedPrice, setFormattedPrice] = useState('');
 
   useEffect(() => {
     if (selectedToken) {
@@ -43,6 +47,28 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
         });
     }
   }, [selectedToken]);
+  
+  // Format number with thousand separators
+  const formatNumber = (value: string): string => {
+    if (!value) return '';
+    
+    // Remove any non-numeric characters except decimal point
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    
+    // Split by decimal point
+    const parts = numericValue.split('.');
+    
+    // Format the integer part with thousand separators
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    
+    // Join back with decimal part if it exists
+    return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
+  };
+  
+  // Parse formatted number back to raw value
+  const parseFormattedNumber = (formatted: string): string => {
+    return formatted.replace(/,/g, '');
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -82,6 +108,8 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
         quantity: '',
         price: '',
       }));
+      setFormattedQuantity('');
+      setFormattedPrice('');
       setError(null);
     } catch (err) {
       console.error('Failed to create order:', err);
@@ -218,8 +246,12 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
                 <Hash className="h-4 w-4 text-gray-400 absolute left-2 top-2.5" />
                 <input
                   type="text"
-                  value={currentOrder.quantity}
-                  onChange={(e) => setCurrentOrder({ ...currentOrder, quantity: e.target.value })}
+                  value={formattedQuantity}
+                  onChange={(e) => {
+                    const formatted = formatNumber(e.target.value);
+                    setFormattedQuantity(formatted);
+                    setCurrentOrder({ ...currentOrder, quantity: parseFormattedNumber(formatted) });
+                  }}
                   placeholder="0.00"
                   className="w-full h-9 pl-8 pr-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -232,8 +264,12 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
                 <Hash className="h-4 w-4 text-gray-400 absolute left-2 top-2.5" />
                 <input
                   type="text"
-                  value={currentOrder.price}
-                  onChange={(e) => setCurrentOrder({ ...currentOrder, price: e.target.value })}
+                  value={formattedPrice}
+                  onChange={(e) => {
+                    const formatted = formatNumber(e.target.value);
+                    setFormattedPrice(formatted);
+                    setCurrentOrder({ ...currentOrder, price: parseFormattedNumber(formatted) });
+                  }}
                   placeholder="100,000"
                   className="w-full h-9 pl-8 pr-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />

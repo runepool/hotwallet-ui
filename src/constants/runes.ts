@@ -21,7 +21,7 @@ export const AVAILABLE_TOKENS: TokenInfo[] = [
   {
     symbol: 'RNP',
     name: 'RUNE•POOL•TOKEN',
-    icon: 'https://ord.runepool.org/preview/06d3e90d5df1efe962d4bf2bf2be1e5fdb6fb697948e5628fb95bc5bc220a088i0',
+    icon: 'https://ord.runepool.org/content/06d3e90d5df1efe962d4bf2bf2be1e5fdb6fb697948e5628fb95bc5bc220a088i0',
     metadata: {
       description: 'Much wow, such coin'
     },

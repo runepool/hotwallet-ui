@@ -84,13 +84,18 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
     setError(null);
     try {
       setLoading(true);
-      await apiClient.splitAsset({
+      const result = await apiClient.splitAsset({
         asset_name: asset,
         splits: numOutputs,
         amount_per_split: amountPerSplit
       });
-      await refreshHealth();
-      onClose();
+      
+      if (result.success) {
+        await refreshHealth();
+        onClose();
+      } else if (result.error) {
+        setError(result.error);
+      }
     } catch (err) {
       console.error('Failed to split UTXOs:', err);
       setError(err instanceof Error ? err.message : 'Failed to split UTXOs. Please try again.');
@@ -121,9 +126,17 @@ export function SplitUtxoModal({ isOpen, onClose, asset, outputs, totalBalance }
           <div className="space-y-6">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="w-5 h-5 text-red-500" />
-                  <span className="text-sm text-red-700">{error}</span>
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-800">
+                    {error.includes('Insufficient') ? (
+                      <>
+                        <span className="font-medium">Insufficient Funds:</span> {error.replace('Insufficient funds: ', '').replace('Insufficient ', '')}
+                      </>
+                    ) : (
+                      error
+                    )}
+                  </div>
                 </div>
               </div>
             )}

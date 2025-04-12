@@ -7,6 +7,19 @@ interface TokenBalancesProps {
 }
 
 export function TokenBalances({ balances }: TokenBalancesProps) {
+  // Format number with thousand separators
+  const formatNumber = (value: string): string => {
+    if (!value) return '0';
+    
+    // Split by decimal point
+    const parts = value.split('.');
+    
+    // Format the integer part with thousand separators
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    
+    // Join back with decimal part if it exists
+    return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
+  };
   return (
     <div className="space-y-1.5">
       {[
@@ -19,7 +32,8 @@ export function TokenBalances({ balances }: TokenBalancesProps) {
         ...AVAILABLE_TOKENS
       ].map(token => {
         const balance = balances.find(b => b.token === (token.symbol === 'BTC' ? 'BTC' : token.name));
-        const amount = balance ? (+balance.balance / 10 ** balance.decimals).toFixed(token.decimals) : '0';
+        const rawAmount = balance ? (+balance.balance / 10 ** balance.decimals).toFixed(token.decimals) : '0';
+        const amount = formatNumber(rawAmount);
         return (
           <div
             key={token.symbol}
