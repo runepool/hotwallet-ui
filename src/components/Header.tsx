@@ -1,6 +1,6 @@
 import { Wallet, AlertCircle, Settings, LogOut } from 'lucide-react';
 import { TokenBalance } from '../types/api';
-import { shortenAddress } from '../utils/format';
+import { AddressDisplay } from './AddressDisplay';
 
 interface HeaderProps {
   error: string | null;
@@ -27,16 +27,17 @@ export function Header({ error, balances, showConfig, setShowConfig, onLogout }:
             ) : (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-md min-w-0">
+                  <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-md h-[30px]">
                     <Wallet className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                    <span className="text-blue-700 font-medium text-sm truncate">
-                      {balances.find(b => b.token === 'BTC')?.address || ''}
-                    </span>
+                    <AddressDisplay 
+                      address={balances.find(b => b.token === 'BTC')?.address || ''} 
+                      maxLength={12}
+                    />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 h-[30px]">
                     <button
                       onClick={() => setShowConfig(!showConfig)}
-                      className="flex items-center gap-1.5 bg-gray-100 px-2 py-1 rounded-md hover:bg-gray-200 transition-colors"
+                      className="flex items-center gap-1.5 bg-gray-100 px-2 py-1 rounded-md hover:bg-gray-200 transition-colors h-full"
                     >
                       <Settings className="w-4 h-4 text-gray-600" />
                       <span className="text-gray-700 font-medium text-sm">Settings</span>
@@ -44,7 +45,7 @@ export function Header({ error, balances, showConfig, setShowConfig, onLogout }:
                     {onLogout && (
                       <button
                         onClick={onLogout}
-                        className="flex items-center gap-1.5 bg-red-50 px-2 py-1 rounded-md hover:bg-red-100 transition-colors"
+                        className="flex items-center gap-1.5 bg-red-50 px-2 py-1 rounded-md hover:bg-red-100 transition-colors h-full"
                       >
                         <LogOut className="w-4 h-4 text-red-600" />
                         <span className="text-red-700 font-medium text-sm">Logout</span>
