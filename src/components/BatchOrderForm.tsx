@@ -12,7 +12,7 @@ interface BatchOrderFormProps {
   onTokenSelect: (token: string | null) => void;
 }
 
-export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: BatchOrderFormProps) {
+export function BatchOrderForm({ selectedToken, onTokenSelect }: BatchOrderFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
@@ -26,7 +26,7 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
     price: '',
     type: 'ask',
   });
-  
+
   // Formatted display values for inputs
   const [formattedQuantity, setFormattedQuantity] = useState('');
   const [formattedPrice, setFormattedPrice] = useState('');
@@ -47,24 +47,24 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
         });
     }
   }, [selectedToken]);
-  
+
   // Format number with thousand separators
   const formatNumber = (value: string): string => {
     if (!value) return '';
-    
+
     // Remove any non-numeric characters except decimal point
     const numericValue = value.replace(/[^0-9.]/g, '');
-    
+
     // Split by decimal point
     const parts = numericValue.split('.');
-    
+
     // Format the integer part with thousand separators
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    
+
     // Join back with decimal part if it exists
     return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
   };
-  
+
   // Parse formatted number back to raw value
   const parseFormattedNumber = (formatted: string): string => {
     return formatted.replace(/,/g, '');
@@ -168,21 +168,19 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
         <div className="inline-flex items-center gap-0.5 bg-gray-50 p-0.5 rounded-lg text-xs">
           <button
             onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'ask' }))}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              currentOrder.type === 'ask'
+            className={`px-2.5 py-1 rounded-md font-medium transition-all ${currentOrder.type === 'ask'
                 ? 'bg-white text-red-600 shadow-sm'
                 : 'text-gray-600 hover:text-red-600'
-            }`}
+              }`}
           >
             Ask
           </button>
           <button
             onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'bid' }))}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              currentOrder.type === 'bid'
+            className={`px-2.5 py-1 rounded-md font-medium transition-all ${currentOrder.type === 'bid'
                 ? 'bg-white text-green-600 shadow-sm'
                 : 'text-gray-600 hover:text-green-600'
-            }`}
+              }`}
           >
             Bid
           </button>
@@ -281,9 +279,8 @@ export function BatchOrderForm({ balances, selectedToken, onTokenSelect }: Batch
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className={`w-full h-9 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5 text-sm font-medium ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`w-full h-9 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5 text-sm font-medium ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               {loading ? (
                 <ArrowUpDown className="w-4 h-4 animate-spin" />

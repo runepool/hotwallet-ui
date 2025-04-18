@@ -1,4 +1,8 @@
 import { CreateRuneOrderDto, RuneOrder, CreateBatchRuneOrderDto, TokenBalance, Transaction, UserSettings, OutputsHealth, SplitAssetRequest, AutoSplitConfig, AutoRebalancingSettings } from '../types/api';
+import ECPairFactory from 'ecpair';
+import * as bitcoin from 'bitcoinjs-lib';
+import * as ecc from '@bitcoinerlab/secp256k1';
+import { Buffer } from 'buffer';
 
 export interface ApiClient {
   // Password management
@@ -8,7 +12,8 @@ export interface ApiClient {
   isLoggedIn(): Promise<boolean>;
   logout(): Promise<boolean>;
   hasWalletConfiguration(): Promise<boolean>;
-  
+  generateFreshPrivateKey(): Promise<string>;
+
   // Existing methods
   createOrder(order: CreateRuneOrderDto): Promise<void>;
   getOrders(): Promise<RuneOrder[]>;
@@ -36,24 +41,24 @@ export interface ApiClient {
 export class HttpApiClient implements ApiClient {
   private baseUrl: string;
   private password: string | null = null;
-  
+
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
-  
+
   async getWalletAddress(): Promise<string> {
     const response = await fetch(`${this.baseUrl}/account/address`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
-    
+
     if (!response.ok) {
       if (response.status === 401) {
         throw new Error('Invalid password');
       }
       throw new Error('Failed to get wallet address');
     }
-    
+
     try {
       const data = await response.json();
       return data.address;
@@ -62,16 +67,16 @@ export class HttpApiClient implements ApiClient {
       throw new Error('Failed to parse wallet address data');
     }
   }
-  
+
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    
+
     if (this.password) {
       headers['X-Password'] = this.password;
     }
-    
+
     return headers;
   }
 
@@ -437,7 +442,7 @@ export class HttpApiClient implements ApiClient {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         password,
         bitcoinPrivateKey,
         oldPassword
@@ -449,7 +454,7 @@ export class HttpApiClient implements ApiClient {
       throw new Error(`Failed to set up password: ${errorText}`);
     }
   }
-  
+
   /**
    * Validates a password by attempting to unlock the wallet
    * @param password The password to validate
@@ -464,7 +469,7 @@ export class HttpApiClient implements ApiClient {
         },
         body: JSON.stringify({ password })
       });
-      
+
       if (!response.ok) {
         // If we get a 401, it means the password is invalid
         if (response.status === 401) {
@@ -472,7 +477,7 @@ export class HttpApiClient implements ApiClient {
         }
         throw new Error('Failed to validate password');
       }
-      
+
       // Store the password for future authenticated requests
       this.password = password;
       return true;
@@ -481,7 +486,7 @@ export class HttpApiClient implements ApiClient {
       return false;
     }
   }
-  
+
   /**
    * Checks if the user is currently logged in without requiring password entry
    * @returns Promise resolving to true if logged in, false otherwise
@@ -494,11 +499,11 @@ export class HttpApiClient implements ApiClient {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         return false;
       }
-      
+
       const data = await response.json();
       return data.isLoggedIn;
     } catch (error) {
@@ -506,7 +511,7 @@ export class HttpApiClient implements ApiClient {
       return false;
     }
   }
-  
+
   /**
    * Logs the user out by clearing wallet data from memory
    * @returns Promise resolving to true if logout was successful
@@ -519,14 +524,14 @@ export class HttpApiClient implements ApiClient {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         return false;
       }
-      
+
       // Clear the stored password
       this.password = null;
-      
+
       const data = await response.json();
       return data.success;
     } catch (error) {
@@ -534,7 +539,38 @@ export class HttpApiClient implements ApiClient {
       return false;
     }
   }
-  
+
+  /**
+   * Generates a fresh Bitcoin private key
+   * @returns Promise resolving to a new Bitcoin private key
+   */
+  async generateFreshPrivateKey(): Promise<string> {
+    try {
+      // Initialize the ECPair library with secp256k1
+      bitcoin.initEccLib(ecc);
+      const ECPair = ECPairFactory(ecc);
+
+      // Generate a random key pair
+      const keyPair = ECPair.makeRandom();
+
+      // Get the private key as a hex string
+      const privateKeyHex = Buffer.from(keyPair.privateKey!).toString('hex');
+
+      if (!privateKeyHex) {
+        throw new Error('Failed to generate private key');
+      }
+
+
+      // We don't need to manually clear the private key in the browser context
+      // The garbage collector will handle this
+
+      return privateKeyHex;
+    } catch (error) {
+      console.error('Error generating fresh private key:', error);
+      throw new Error('Failed to generate Bitcoin private key');
+    }
+  }
+
   /**
    * Checks if the wallet has been configured with a Bitcoin private key
    * @returns Promise resolving to true if wallet is configured, false otherwise
@@ -547,7 +583,7 @@ export class HttpApiClient implements ApiClient {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         // If we get a 401, it means there's a key but it's password protected
         if (response.status === 401) {
@@ -555,7 +591,7 @@ export class HttpApiClient implements ApiClient {
         }
         return false;
       }
-      
+
       const settings = await response.json();
       return !!settings.bitcoinPrivateKey;
     } catch (error) {

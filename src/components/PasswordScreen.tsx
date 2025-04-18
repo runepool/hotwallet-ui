@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Key, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useMain } from '../context/MainContext';
+import './password-field.css';
+import { PrivateKeySetupStep } from './PrivateKeySetupStep';
+import { PasswordSetupStep } from './PasswordSetupStep';
+import { StepIndicator } from './StepIndicator';
+import { UnlockPasswordField } from './UnlockPasswordField';
 
 interface PasswordScreenProps {
   onUnlock: () => void;
@@ -13,19 +18,36 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [oldPassword, setOldPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isNewKey, setIsNewKey] = useState(isInitialSetup);
   const [bitcoinPrivateKey, setBitcoinPrivateKey] = useState('');
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+  const [hasBackedUpKey, setHasBackedUpKey] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1); // Step 1: Private Key, Step 2: Password
   
   // Log the current state for debugging
   useEffect(() => {
-    console.log('PasswordScreen state:', { isInitialSetup, hasPassword, isNewKey, isChangingPassword });
-  }, [isInitialSetup, hasPassword, isNewKey, isChangingPassword]);
+    console.log('PasswordScreen state:', { 
+      isInitialSetup, 
+      hasPassword, 
+      isNewKey, 
+      isChangingPassword,
+      currentStep
+    });
+  }, [isInitialSetup, hasPassword, isNewKey, isChangingPassword, currentStep]);
+  
+  // Toggle password change mode
+  const togglePasswordChangeMode = () => {
+    setIsChangingPassword(prev => !prev);
+    // Reset fields when toggling modes
+    setOldPassword('');
+    setPassword('');
+    setConfirmPassword('');
+    setError(null);
+  };
 
   // Use the hasPassword state from context instead of checking separately
   // Or use isInitialSetup if provided
@@ -39,7 +61,10 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
       try {
         // Only check if not in initial setup mode
         if (!isInitialSetup) {
+          console.log('Checking wallet configuration status...');
           const hasConfig = await apiClient.hasWalletConfiguration();
+          console.log('Has wallet configuration:', hasConfig);
+          
           if (hasConfig) {
             // If we have configuration, check if password is set
             const settings = await apiClient.getSettings();
@@ -47,28 +72,114 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
             
             // Update isNewKey based on hasPassword from settings
             setIsNewKey(!settings.hasPassword);
+          } else {
+            // No configuration means we need to set up a new key
+            console.log('No wallet configuration found, setting isNewKey to true');
+            setIsNewKey(true);
           }
         }
       } catch (error) {
         console.error('Error checking password status:', error);
+        // In case of error, assume we need to set up a new key
+        setIsNewKey(true);
       }
     };
 
     checkPasswordStatus();
   }, [apiClient, isInitialSetup]);
 
+  const generateFreshKey = async () => {
+    try {
+      setIsGeneratingKey(true);
+      setError(null);
+      
+      // Generate a fresh Bitcoin private key
+      const privateKey = await apiClient.generateFreshPrivateKey();
+      setBitcoinPrivateKey(privateKey);
+      
+      // Private key is now always visible in the textarea
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate private key');
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
+
+  const nextStep = () => {
+    // Validate current step before proceeding
+    if (currentStep === 1) {
+      // Validate private key
+      if (!bitcoinPrivateKey) {
+        setError('Bitcoin private key is required');
+        return;
+      }
+      if (bitcoinPrivateKey.length < 30) {
+        setError('Invalid Bitcoin private key format');
+        return;
+      }
+      if (!hasBackedUpKey) {
+        setError('Please confirm that you have backed up your private key');
+        return;
+      }
+      
+      // Clear any errors and proceed to next step
+      setError(null);
+      setCurrentStep(2);
+    }
+  };
+  
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
   const handleSubmit = async () => {
     setError(null);
     setLoading(true);
     
+    // Debug the current state when submitting
+    console.log('Submit state:', { 
+      isInitialSetup, 
+      isNewKey, 
+      isChangingPassword, 
+      currentStep,
+      hasPassword,
+      passwordLength: password.length,
+      bitcoinKeyLength: bitcoinPrivateKey.length
+    });
+    
     try {
-      // Validate inputs
-      if (isInitialSetup) {
+      // UNLOCK SCENARIO: User is unlocking an existing wallet
+      if (!isInitialSetup && !isNewKey && !isChangingPassword) {
+        if (!password) {
+          throw new Error('Password is required');
+        }
+        
+        console.log('Attempting to unlock with password');
+        // Directly try to unlock with the password
+        const success = await unlockWallet(password);
+        console.log('Unlock result:', success);
+        
+        if (!success) {
+          throw new Error('Invalid password');
+        }
+        
+        // If successful, call onUnlock and return early
+        onUnlock();
+        return;
+      }
+      
+      // SETUP SCENARIO: Initial setup with Bitcoin private key
+      else if (isInitialSetup) {
         if (!bitcoinPrivateKey) {
           throw new Error('Bitcoin private key is required');
         }
         if (bitcoinPrivateKey.length < 30) {
           throw new Error('Invalid Bitcoin private key format');
+        }
+        if (!hasBackedUpKey) {
+          throw new Error('Please confirm that you have backed up your private key');
         }
       }
 
@@ -123,13 +234,15 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
             throw new Error('Failed to set up password');
           }
         }
-      } else {
-        // Unlock with existing password
-        const success = await unlockWallet(password);
+      } else if (isNewKey && !isInitialSetup) {
+        // Just set up password for existing key
+        const success = await setupPassword(password);
         if (!success) {
-          throw new Error('Invalid password');
+          throw new Error('Failed to set up password');
         }
       }
+      
+      // Only reach here for non-unlock scenarios
       setLoading(false);
       onUnlock();
     } catch (err) {
@@ -173,36 +286,42 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
         
           </div>
         )}
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          // For unlock scenario, directly call handleSubmit
+          if (!isInitialSetup && !isNewKey && !isChangingPassword) {
+            handleSubmit();
+          } else {
+            // For setup scenarios, handle the multi-step process
+            currentStep === 2 ? handleSubmit() : nextStep();
+          }
+        }}>
+          {/* Step indicator */}
           {isInitialSetup && (
-            <div className="mb-6">
-              <div className="flex items-center mb-2">
-                <Key className="w-5 h-5 text-gray-500 mr-2" />
-                <label htmlFor="bitcoinPrivateKey" className="text-sm font-medium text-gray-700">
-                  Bitcoin Private Key
-                </label>
-              </div>
-              <p className="text-xs text-gray-500 mb-2">
-                Your private key will be encrypted and stored locally
-              </p>
-              <div className="relative">
-                <input
-                  type={showPrivateKey ? 'text' : 'password'}
-                  id="bitcoinPrivateKey"
-                  value={bitcoinPrivateKey}
-                  onChange={(e) => setBitcoinPrivateKey(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your Bitcoin private key"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPrivateKey(!showPrivateKey)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                >
-                  {showPrivateKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
+            <StepIndicator 
+              currentStep={currentStep} 
+              totalSteps={2} 
+              stepTitles={['Set up your Bitcoin private key', 'Create a password']} 
+            />
+          )}
+          
+          {isInitialSetup && currentStep === 1 && (
+            <PrivateKeySetupStep
+              bitcoinPrivateKey={bitcoinPrivateKey}
+              setBitcoinPrivateKey={setBitcoinPrivateKey}
+              hasBackedUpKey={hasBackedUpKey}
+              setHasBackedUpKey={setHasBackedUpKey}
+              generateFreshKey={generateFreshKey}
+              isGeneratingKey={isGeneratingKey}
+            />
+          )}
+          {/* Regular password input for unlock scenario */}
+          {!isInitialSetup && !isNewKey && !isChangingPassword && (
+            <UnlockPasswordField 
+              password={password}
+              setPassword={setPassword}
+              onSubmit={handleSubmit}
+            />
           )}
           
           {isChangingPassword && (
@@ -232,58 +351,13 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
               </div>
             </div>
           )}
-          <div className="mb-6">
-            <div className="flex items-center mb-2">
-              <Lock className="w-5 h-5 text-gray-500 mr-2" />
-              <label htmlFor="password" className="text-sm font-medium text-gray-700">
-                {isNewKey ? 'Create Password' : 'Password'}
-              </label>
-            </div>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-
-          {isNewKey && (
-            <div className="mb-6">
-              <div className="flex items-center mb-2">
-                <Lock className="w-5 h-5 text-gray-500 mr-2" />
-                <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
-                  Confirm Password
-                </label>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="confirmPassword"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Confirm your password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
+          {isInitialSetup && currentStep === 2 && (
+            <PasswordSetupStep
+              password={password}
+              setPassword={setPassword}
+              confirmPassword={confirmPassword}
+              setConfirmPassword={setConfirmPassword}
+            />
           )}
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
@@ -291,24 +365,40 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
               <p>{error}</p>
             </div>
           )}
-          <div className="pt-4 flex gap-3">
-            {onCancel && (
+          {/* Change password button removed from unlock screen */}
+          
+          {isChangingPassword && (
+            <div className="mt-4 mb-2">
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={togglePasswordChangeMode}
+                className="w-full py-2 px-4 bg-gray-100 text-gray-800 rounded-md border border-gray-300 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center"
+              >
+                <span className="flex items-center">
+                  Cancel Password Change
+                </span>
+              </button>
+            </div>
+          )}
+          
+          <div className="pt-4 flex gap-3">
+            {(onCancel || (isInitialSetup && currentStep > 1)) && (
+              <button
+                type="button"
+                onClick={isInitialSetup && currentStep > 1 ? prevStep : onCancel}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 disabled={loading}
               >
-                Cancel
+                {isInitialSetup && currentStep > 1 ? 'Back' : 'Cancel'}
               </button>
             )}
             <button
               type="submit"
               className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center"
               disabled={loading || 
-                (!isNewKey && !password) || 
-                (isNewKey && (!password || !confirmPassword)) ||
-                (isInitialSetup && !bitcoinPrivateKey)}
+                (currentStep === 2 && (!password || !confirmPassword)) ||
+                (currentStep === 1 && isInitialSetup && (!bitcoinPrivateKey || !hasBackedUpKey)) ||
+                (!isInitialSetup && !isNewKey && !isChangingPassword && !password)}
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -318,7 +408,9 @@ export function PasswordScreen({ onUnlock, onCancel, isInitialSetup = false }: P
                   </svg>
                   Loading...
                 </span>
-              ) : isInitialSetup ? (
+              ) : isInitialSetup && currentStep === 1 ? (
+                'Continue'
+              ) : isInitialSetup && currentStep === 2 ? (
                 'Set Up Wallet'
               ) : isNewKey ? (
                 'Create Password'
