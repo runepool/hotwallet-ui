@@ -95,21 +95,17 @@ export function BatchOrderForm({ selectedToken, onTokenSelect }: BatchOrderFormP
         throw new Error('Token not found');
       }
 
+      // Convert price to integer by multiplying by 10000 to support 4 decimal places
+      const priceAsInteger = Math.round(parseFloat(currentOrder.price) * 10000).toString();
+      
       await addOrder({
         rune: currentOrder.rune,
         quantity: (+currentOrder.quantity * 10 ** selectedToken.decimals).toFixed(0),
-        price: currentOrder.price,
+        price: priceAsInteger,
         type: currentOrder.type
       });
 
-      // Reset form
-      setCurrentOrder(prev => ({
-        ...prev,
-        quantity: '',
-        price: '',
-      }));
-      setFormattedQuantity('');
-      setFormattedPrice('');
+      // Don't reset form values, just clear any errors
       setError(null);
     } catch (err) {
       console.error('Failed to create order:', err);

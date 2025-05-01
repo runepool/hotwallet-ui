@@ -16,17 +16,48 @@ interface OrderTableProps {
 }
 
 function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, className, headerPosition = 'top', showColumnHeaders = false }: OrderTableProps & { headerPosition?: 'top' | 'bottom', title: string, type: 'ask' | 'bid', showColumnHeaders?: boolean }) {
+  // Filter orders by search term if provided
+  const filteredOrders = searchTerm
+    ? orders.filter(order => {
+        const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          order.rune.toLowerCase().includes(searchLower) ||
+          order.quantity.toString().includes(searchLower) ||
+          order.price.toString().includes(searchLower) ||
+          (token?.symbol || '').toLowerCase().includes(searchLower)
+        );
+      })
+    : orders;
+  // Format number with thousand separators and only show decimals when necessary
+  const formatNumber = (value: string | number, maxDecimals: number = 0): string => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '0';
+    
+    // Check if the number has decimal places
+    const hasDecimals = num !== Math.floor(num);
+    
+    // Format with proper decimal places - only show if necessary
+    const formatted = num.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: hasDecimals ? maxDecimals : 0
+    });
+    
+    return formatted;
+  };
+  
   const formatQuantity = (order: RuneOrder) => {
     const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
-    if (!token) return order.quantity;
-    return (+order.quantity / 10 ** token.decimals).toString();
+    if (!token) return formatNumber(order.quantity, 0);
+    const decimals = token.decimals || 0;
+    return formatNumber(+order.quantity / 10 ** decimals, decimals > 0 ? Math.min(decimals, 6) : 0);
   };
 
   const header = (
     <div className="px-3 py-1.5 border-b border-gray-100 flex items-center bg-white">
       <div className="w-[35%] flex items-center gap-2">
         <h3 className="text-sm font-medium text-gray-900">{title}</h3>
-        <span className="text-xs text-gray-500">{orders.length} orders</span>
+        <span className="text-xs text-gray-500">{filteredOrders.length} orders</span>
       </div>
       {showColumnHeaders && (
         <>
@@ -45,7 +76,7 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
     </div>
   );
 
-  const ordersToDisplay = type === 'ask' ? [...orders].reverse() : orders;
+  const ordersToDisplay = type === 'ask' ? [...filteredOrders].reverse() : filteredOrders;
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col ${className}`}>
@@ -56,40 +87,65 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
             {ordersToDisplay.map((order) => {
               const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
               const progress = order.filledQuantity ? (+order.filledQuantity / +order.quantity) * 100 : 0;
+              
+              // Group orders by creation time (within 1 second) to identify batch orders
+              // This is a heuristic since we don't have a batchId property
+              const creationTime = order.createdAt ? new Date(order.createdAt).getTime() : 0;
+              const similarOrders = ordersToDisplay.filter(o => {
+                if (!o.createdAt || !order.createdAt) return false;
+                const otherTime = new Date(o.createdAt).getTime();
+                return Math.abs(otherTime - creationTime) < 1000 && o.rune === order.rune && o.type === order.type;
+              });
+              const isBatchOrder = similarOrders.length > 1;
+              
               return (
-                <tr key={order.id} className={`hover:bg-gray-50 relative ${type === 'ask' ? 'flex' : ''}`}>
+                <tr 
+                  key={order.id} 
+                  className={`hover:bg-gray-50 relative ${type === 'ask' ? 'flex' : ''} ${isBatchOrder ? 'bg-blue-50/30' : ''}`}
+                >
                   <td className="w-[35%] px-3 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <img src={token?.icon || ''} alt={token?.symbol || ''} className="w-5 h-5 rounded-full" />
-                      <span className="font-medium text-sm text-gray-900">{token?.symbol || order.rune}</span>
+                      <img 
+                        src={token?.icon ?? ''} 
+                        alt={token?.symbol ?? ''} 
+                        className="w-5 h-5 rounded-full" 
+                      />
+                      <div>
+                        <span className="font-medium text-sm text-gray-900">{token?.symbol || order.rune}</span>
+                        {isBatchOrder && (
+                          <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-sm">Batch</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm text-gray-900">
                     {formatQuantity(order)}
                   </td>
                   <td className={`w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm font-medium ${type === 'ask' ? 'text-red-500' : 'text-green-500'}`}>
-                    {order.price}
+                    {formatNumber(parseFloat(order.price) / 10000, 4)}
                   </td>
                   <td className="w-[15%] px-3 py-2 text-right whitespace-nowrap">
-                    <span className="text-xs font-medium text-gray-500">{progress.toFixed(2)}%</span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs font-medium text-gray-500">{progress.toFixed(2)}%</span>
+                      {progress > 0 && (
+                        <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                          <div 
+                            className={`h-full ${type === 'ask' ? 'bg-red-500' : 'bg-green-500'}`}
+                            style={{ width: `${progress}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="w-[10%] px-3 py-2 text-right whitespace-nowrap">
                     <button
-                      onClick={() => onDeleteOrder(order.id)}
+                      onClick={() => onDeleteOrder(order.id!)}
                       className="text-gray-400 hover:text-red-500 transition-colors"
+                      aria-label="Delete order"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
-                  {/* Progress background */}
-                  {progress > 0 && (
-                    <td
-                      className="absolute inset-0 pointer-events-none"
-                      style={{
-                        background: `linear-gradient(to right, ${type === 'ask' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(34, 197, 94, 0.05)'} ${progress.toString()}%, transparent ${progress.toString()}%)`
-                      }}
-                    />
-                  )}
                 </tr>
               );
             })}
@@ -226,7 +282,7 @@ export function OrderList() {
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-medium text-gray-500">Spread</span>
                     <span className="text-xs font-medium text-gray-900">
-                      {((+askOrders[0].price - +bidOrders[0].price) / +askOrders[0].price * 100).toFixed(2)}%
+                      {askOrders[0] && bidOrders[0] ? ((+askOrders[0].price - +bidOrders[0].price) / +askOrders[0].price * 100).toFixed(2) + '%' : '-'}
                     </span>
                   </div>
                 </div>
