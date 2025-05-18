@@ -80,7 +80,7 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col ${className}`}>
-      {headerPosition === 'top' && header}
+      {headerPosition === 'top' && <div className="sticky top-0 z-10">{header}</div>}
       <div className={`flex-1 ${type === 'ask' ? 'flex flex-col justify-end' : ''}`}>
         <table className="min-w-full">
           <tbody className={`divide-y divide-gray-100 ${type === 'ask' ? 'flex flex-col' : ''}`}>
@@ -149,7 +149,7 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
           </tbody>
         </table>
       </div>
-      {headerPosition === 'bottom' && header}
+      {headerPosition === 'bottom' && <div className="sticky bottom-0 z-10">{header}</div>}
     </div>
   );
 }
