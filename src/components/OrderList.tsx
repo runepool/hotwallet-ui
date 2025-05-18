@@ -13,12 +13,13 @@ import { TransactionList } from './TransactionList';
 export function OrderList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
-  const { orders, deleteOrder, deleteBatchOrders, refreshOrders, outputsHealth, balances } = useMain();
-  const defaultToken = AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')?.name || null;
-  const [selectedToken, setSelectedToken] = useState<string | null>(defaultToken);
+  const [activeTab, setActiveTab] = useState<'placeOrder' | 'marketMaker'>('placeOrder');
+  const [batchOrderType, setBatchOrderType] = useState<'ask' | 'bid'>('ask');
+  const [marketMakerOrderType, setMarketMakerOrderType] = useState<'ask' | 'bid'>('ask');
+  const [selectedToken, setSelectedToken] = useState<string | null>(AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')?.name || null);
   const [showAskConfirmation, setShowAskConfirmation] = useState(false);
   const [showBidConfirmation, setShowBidConfirmation] = useState(false);
-  const [activeTab, setActiveTab] = useState<'placeOrder' | 'marketMaker'>('placeOrder');
+  const { orders, deleteOrder, deleteBatchOrders, refreshOrders, outputsHealth, balances } = useMain();
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
@@ -230,7 +231,7 @@ export function OrderList() {
                                 {formatQuantity(order)}
                               </td>
                               <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm font-medium text-red-500">
-                                {formatNumber(parseFloat(order.price) / 1e8, 8)} BTC
+                                {formatNumber(parseFloat(order.price) / 10000, 4)}
                               </td>
                               <td className="w-[15%] px-3 py-2 text-right whitespace-nowrap">
                                 <div className="flex flex-col items-end">
@@ -318,7 +319,8 @@ export function OrderList() {
                                 {formatQuantity(order)}
                               </td>
                               <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm font-medium text-green-500">
-                                {formatNumber(parseFloat(order.price) / 1e8, 8)} BTC
+                                {formatNumber(parseFloat(order.price) / 10000, 4)}
+
                               </td>
                               <td className="w-[15%] px-3 py-2 text-right whitespace-nowrap">
                                 <div className="flex flex-col items-end">
@@ -396,7 +398,7 @@ export function OrderList() {
             </div>
           </div>
           <div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
-            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200" style={{ maxHeight: '450px' }}>
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200">
               {/* Tabbed interface */}
               <div className="border-b border-gray-200">
                 <div className="flex">
@@ -422,6 +424,47 @@ export function OrderList() {
                       <span>Market Maker</span>
                     </div>
                   </button>
+
+
+                  {/* Ask/Bid selector */}
+                  <div className="flex justify-end px-4 py-2">
+                    <div className="inline-flex items-center gap-0.5 bg-gray-50 p-0.5 rounded-lg text-xs">
+                      <button
+                        onClick={() => {
+                          if (activeTab === 'placeOrder') {
+                            // For BatchOrderForm
+                            setBatchOrderType('ask');
+                          } else {
+                            // For MarketMakerTool
+                            setMarketMakerOrderType('ask');
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-md font-medium transition-all ${(activeTab === 'placeOrder' ? batchOrderType : marketMakerOrderType) === 'ask'
+                          ? 'bg-white text-red-600 shadow-sm'
+                          : 'text-gray-600 hover:text-red-600'
+                          }`}
+                      >
+                        Ask
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (activeTab === 'placeOrder') {
+                            // For BatchOrderForm
+                            setBatchOrderType('bid');
+                          } else {
+                            // For MarketMakerTool
+                            setMarketMakerOrderType('bid');
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-md font-medium transition-all ${(activeTab === 'placeOrder' ? batchOrderType : marketMakerOrderType) === 'bid'
+                          ? 'bg-white text-green-600 shadow-sm'
+                          : 'text-gray-600 hover:text-green-600'
+                          }`}
+                      >
+                        Bid
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -432,6 +475,8 @@ export function OrderList() {
                     balances={balances}
                     selectedToken={selectedToken}
                     onTokenSelect={setSelectedToken}
+                    orderType={batchOrderType}
+                    onOrderTypeChange={setBatchOrderType}
                   />
                 )}
                 {activeTab === 'marketMaker' && (
@@ -439,6 +484,8 @@ export function OrderList() {
                     balances={balances}
                     selectedToken={selectedToken}
                     onTokenSelect={setSelectedToken}
+                    orderType={marketMakerOrderType}
+                    onOrderTypeChange={setMarketMakerOrderType}
                   />
                 )}
               </div>

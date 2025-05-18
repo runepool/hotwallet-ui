@@ -1,23 +1,30 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Plus, Coins, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { BookOpen, Plus, Coins, AlertCircle, ArrowUpDown, Hash } from 'lucide-react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { useMain } from '../context/MainContext';
 import { RuneOrder, TokenBalance } from '../types/api';
+import { getAutoRebalancing, updateAutoRebalancing } from '../api/autoRebalancing';
+import { AutoRebalancing } from './AutoRebalancing';
 
 interface MarketMakerToolProps {
   selectedToken: string | null;
   balances: TokenBalance[];
   onTokenSelect: (token: string | null) => void;
-  initialOrderType?: 'ask' | 'bid';
+  orderType: 'ask' | 'bid';
+  onOrderTypeChange: (type: 'ask' | 'bid') => void;
 }
 
-export function MarketMakerTool({ selectedToken, balances, onTokenSelect, initialOrderType = 'ask' }: MarketMakerToolProps) {
+export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderType, onOrderTypeChange }: MarketMakerToolProps) {
   const { addOrder } = useMain();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Auto rebalancing settings
+  const [autoRebalancingEnabled, setAutoRebalancingEnabled] = useState(false);
+  const [autoRebalancingSpread, setAutoRebalancingSpread] = useState('0.5');
   
   // Market maker settings
   const [percentOfBalance, setPercentOfBalance] = useState(10); // Default 10% of balance
@@ -28,12 +35,10 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, initia
     current: 0,
     inputValue: ''
   });
-  const [orderType, setOrderType] = useState<'ask' | 'bid'>(initialOrderType);
-  
-  // Update order type when initialOrderType changes
+  // Update local state when orderType prop changes
   useEffect(() => {
-    setOrderType(initialOrderType);
-  }, [initialOrderType]);
+    // Update any local state that depends on order type
+  }, [orderType]);
   const [spreadPercentage, setSpreadPercentage] = useState(2); // Default 2% spread
   
   // Get the selected token's balance and info
@@ -61,6 +66,7 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, initia
   const selectedTokenInfo = selectableTokens.find(token => token.name === selectedToken);
   
   // Calculate the current price based on existing orders or set a default
+  // and fetch auto-rebalancing settings
   useEffect(() => {
     if (selectedToken) {
       // For a real implementation, you might want to fetch the current market price
@@ -70,6 +76,18 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, initia
         ...prev,
         current: 1.0
       }));
+      
+      // Fetch auto-rebalancing settings for the selected token
+      getAutoRebalancing(selectedToken)
+        .then(settings => {
+          setAutoRebalancingEnabled(settings.enabled);
+          setAutoRebalancingSpread(settings.spread);
+        })
+        .catch(err => {
+          console.error('Failed to fetch auto-rebalancing settings:', err);
+          setAutoRebalancingEnabled(false);
+          setAutoRebalancingSpread('0.5');
+        });
     }
   }, [selectedToken]);
   
@@ -136,7 +154,43 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, initia
   
   // Don't update preview orders in the context - we're not showing them in the order book
   
-  // Handle form submission
+  // Handle auto-rebalancing toggle
+  const handleAutoRebalancingChange = async (enabled: boolean) => {
+    if (!selectedToken) return;
+    
+    setAutoRebalancingEnabled(enabled);
+    try {
+      await updateAutoRebalancing(selectedToken, {
+        enabled,
+        spread: autoRebalancingSpread
+      });
+    } catch (err) {
+      console.error('Failed to update auto-rebalancing:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update auto-rebalancing');
+    }
+  };
+
+  // Handle spread changes
+  const handleSpreadChange = (value: string) => {
+    setAutoRebalancingSpread(value);
+  };
+
+  // Handle spread blur (save changes)
+  const handleSpreadBlur = async () => {
+    if (!selectedToken) return;
+    
+    try {
+      await updateAutoRebalancing(selectedToken, {
+        enabled: autoRebalancingEnabled,
+        spread: autoRebalancingSpread
+      });
+    } catch (err) {
+      console.error('Failed to update auto-rebalancing spread:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update auto-rebalancing');
+    }
+  };
+  
+  // Handle form submission for creating market maker orders
   const handleSubmit = async () => {
     if (!selectedToken) {
       setError('Please select a token');
@@ -414,6 +468,17 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, initia
               )}
             </button>
           </div>
+        </div>
+
+        {/* Auto Rebalancing Section */}
+        <div className="mt-6 border-t border-gray-100 pt-4">
+          <AutoRebalancing
+            enabled={autoRebalancingEnabled}
+            spread={autoRebalancingSpread}
+            onEnabledChange={handleAutoRebalancingChange}
+            onSpreadChange={handleSpreadChange}
+            onSpreadBlur={handleSpreadBlur}
+          />
         </div>
       </div>
     </div>

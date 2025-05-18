@@ -159,30 +159,7 @@ export function BatchOrderForm({ selectedToken, onTokenSelect }: BatchOrderFormP
 
   return (
     <div className="h-full flex flex-col" >
-      <div className="p-3 border-b border-gray-100 flex justify-between items-center" >
-        <h2 className="text-sm font-medium text-gray-900">Place Order</h2>
-        <div className="inline-flex items-center gap-0.5 bg-gray-50 p-0.5 rounded-lg text-xs">
-          <button
-            onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'ask' }))}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${currentOrder.type === 'ask'
-                ? 'bg-white text-red-600 shadow-sm'
-                : 'text-gray-600 hover:text-red-600'
-              }`}
-          >
-            Ask
-          </button>
-          <button
-            onClick={() => setCurrentOrder(prev => ({ ...prev, type: 'bid' }))}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${currentOrder.type === 'bid'
-                ? 'bg-white text-green-600 shadow-sm'
-                : 'text-gray-600 hover:text-green-600'
-              }`}
-          >
-            Bid
-          </button>
-        </div>
-      </div>
-
+   
       <div className="flex-1 p-3">
         {error && (
           <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1 text-sm">
