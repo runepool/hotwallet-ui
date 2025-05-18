@@ -33,19 +33,19 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
   const formatNumber = (value: string | number, maxDecimals: number = 0): string => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return '0';
-    
+
     // Check if the number has decimal places
     const hasDecimals = num !== Math.floor(num);
-    
+
     // Format with proper decimal places - only show if necessary
     const formatted = num.toLocaleString('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: hasDecimals ? maxDecimals : 0
     });
-    
+
     return formatted;
   };
-  
+
   const formatQuantity = (order: RuneOrder) => {
     const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
     if (!token) return formatNumber(order.quantity, 0);
@@ -81,40 +81,30 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col ${className}`}>
       {headerPosition === 'top' && header}
-      <div className={`overflow-auto flex-1 ${type === 'ask' ? 'flex flex-col justify-end' : ''}`}>
+      <div className={`flex-1 ${type === 'ask' ? 'flex flex-col justify-end' : ''}`}>
         <table className="min-w-full">
           <tbody className={`divide-y divide-gray-100 ${type === 'ask' ? 'flex flex-col' : ''}`}>
             {ordersToDisplay.map((order) => {
               const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
               const progress = order.filledQuantity ? (+order.filledQuantity / +order.quantity) * 100 : 0;
-              
-              // Group orders by creation time (within 1 second) to identify batch orders
-              // This is a heuristic since we don't have a batchId property
-              const creationTime = order.createdAt ? new Date(order.createdAt).getTime() : 0;
-              const similarOrders = ordersToDisplay.filter(o => {
-                if (!o.createdAt || !order.createdAt) return false;
-                const otherTime = new Date(o.createdAt).getTime();
-                return Math.abs(otherTime - creationTime) < 1000 && o.rune === order.rune && o.type === order.type;
-              });
-              const isBatchOrder = similarOrders.length > 1;
-              
+
+              // Order details
+
               return (
-                <tr 
-                  key={order.id} 
-                  className={`hover:bg-gray-50 relative ${type === 'ask' ? 'flex' : ''} ${isBatchOrder ? 'bg-blue-50/30' : ''}`}
+                <tr
+                  key={order.id}
+                  className={`hover:bg-gray-50 relative ${type === 'ask' ? 'flex' : ''}`}
                 >
                   <td className="w-[35%] px-3 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <img 
-                        src={token?.icon ?? ''} 
-                        alt={token?.symbol ?? ''} 
-                        className="w-5 h-5 rounded-full" 
+                      <img
+                        src={token?.icon ?? ''}
+                        alt={token?.symbol ?? ''}
+                        className="w-5 h-5 rounded-full"
                       />
                       <div>
                         <span className="font-medium text-sm text-gray-900">{token?.symbol || order.rune}</span>
-                        {isBatchOrder && (
-                          <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-sm">Batch</span>
-                        )}
+
                       </div>
                     </div>
                   </td>
@@ -129,7 +119,7 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
                       <span className="text-xs font-medium text-gray-500">{progress.toFixed(2)}%</span>
                       {progress > 0 && (
                         <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
-                          <div 
+                          <div
                             className={`h-full ${type === 'ask' ? 'bg-red-500' : 'bg-green-500'}`}
                             style={{ width: `${progress}%` }}
                           ></div>
@@ -265,17 +255,19 @@ export function OrderList() {
         <div className="flex gap-4">
           <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="flex flex-col h-[calc(100vh-10rem)]">
-              <OrderTable
-                orders={askOrders}
-                title="Ask Orders"
-                type="ask"
-                searchTerm={searchTerm}
-                onDeleteOrder={handleDeleteOrder}
-                className="flex-1 rounded-none border-0 flex flex-col justify-end"
-                headerPosition="top"
-                showColumnHeaders={true}
-              />
-              
+              <div className="flex-1 max-h-[50%] overflow-auto" style={{ display: 'block' }}>
+                <OrderTable
+                  orders={askOrders}
+                  title="Ask Orders"
+                  type="ask"
+                  searchTerm={searchTerm}
+                  onDeleteOrder={handleDeleteOrder}
+                  className="h-full rounded-none border-0 flex flex-col"
+                  headerPosition="top"
+                  showColumnHeaders={true}
+                />
+              </div>
+
               {/* Spread indicator */}
               {askOrders.length > 0 && bidOrders.length > 0 && (
                 <div className="px-3 py-1.5 border-y border-gray-100 bg-gray-50/75">
@@ -288,23 +280,23 @@ export function OrderList() {
                 </div>
               )}
 
-              <OrderTable
-                orders={bidOrders}
-                title="Bid Orders"
-                type="bid"
-                searchTerm={searchTerm}
-                onDeleteOrder={handleDeleteOrder}
-                className="flex-1 rounded-none border-0"
-                headerPosition="bottom"
-                showColumnHeaders={false}
-              />
+              <div className="flex-1 max-h-[50%] overflow-auto" style={{ display: 'block' }}>
+                <OrderTable
+                  orders={bidOrders}
+                  title="Bid Orders"
+                  type="bid"
+                  searchTerm={searchTerm}
+                  onDeleteOrder={handleDeleteOrder}
+                  className="h-full rounded-none border-0"
+                  headerPosition="bottom"
+                  showColumnHeaders={false}
+                />
+              </div>
             </div>
-          </div>
-          
-          <div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
+          </div><div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
             <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200" style={{ maxHeight: '450px' }}>
-              <BatchOrderForm 
-                balances={balances} 
+              <BatchOrderForm
+                balances={balances}
                 selectedToken={selectedToken}
                 onTokenSelect={setSelectedToken}
               />
