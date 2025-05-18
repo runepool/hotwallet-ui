@@ -53,14 +53,45 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
     return formatNumber(+order.quantity / 10 ** decimals, decimals > 0 ? Math.min(decimals, 6) : 0);
   };
 
+  // Calculate total rune amount and BTC value
+  const totalRune = filteredOrders.reduce((sum, order) => {
+    const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+    const decimals = token?.decimals || 0;
+    const actualQuantity = +order.quantity / (10 ** decimals);
+    return sum + actualQuantity;
+  }, 0);
+  
+  const totalBtcValue = filteredOrders.reduce((sum, order) => {
+    const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+    const decimals = token?.decimals || 0;
+    const actualQuantity = +order.quantity / (10 ** decimals);
+    const btcPrice = parseFloat(order.price) / 10000; // Price in BTC
+    return sum + (actualQuantity * btcPrice);
+  }, 0);
+
   const header = (
-    <div className="px-3 py-1.5 border-b border-gray-100 flex items-center bg-white">
-      <div className="w-[35%] flex items-center gap-2">
-        <h3 className="text-sm font-medium text-gray-900">{title}</h3>
-        <span className="text-xs text-gray-500">{filteredOrders.length} orders</span>
+    <div className="px-3 py-1.5 border-b border-gray-100 bg-white">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-gray-900">{title}</h3>
+          <span className="text-xs text-gray-500">{filteredOrders.length} orders</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs">
+            <span className="font-medium text-gray-500">Total:</span>
+            <span className="ml-1 font-medium text-gray-900">{formatNumber(totalRune, 4)}</span>
+          </div>
+          <div className="text-xs">
+            <span className="font-medium text-gray-500">Value:</span>
+            <span className="ml-1 font-medium text-gray-900">{formatNumber(totalBtcValue, 8)} BTC</span>
+          </div>
+        </div>
       </div>
       {showColumnHeaders && (
-        <>
+        <div className="flex mt-1.5">
+          <div className="w-[35%]">
+            <span className="text-xs font-medium text-gray-500">Token</span>
+          </div>
           <div className="w-[20%] text-right">
             <span className="text-xs font-medium text-gray-500">Qty</span>
           </div>
@@ -71,7 +102,7 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
             <span className="text-xs font-medium text-gray-500">Filled</span>
           </div>
           <div className="w-[10%]"></div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -81,7 +112,7 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col ${className}`}>
       {headerPosition === 'top' && <div className="sticky top-0 z-10">{header}</div>}
-      <div className={`flex-1 ${type === 'ask' ? 'flex flex-col justify-end' : ''}`}>
+      <div className={`flex-1 overflow-auto ${type === 'ask' ? 'flex flex-col justify-end' : ''}`}>
         <table className="min-w-full">
           <tbody className={`divide-y divide-gray-100 ${type === 'ask' ? 'flex flex-col' : ''}`}>
             {ordersToDisplay.map((order) => {
@@ -169,6 +200,30 @@ export function OrderList() {
       console.error('Failed to delete order:', error);
     }
   };
+  
+  // Format number with thousand separators and only show decimals when necessary
+  const formatNumber = (value: string | number, maxDecimals: number = 0): string => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '0';
+    
+    // Check if the number has decimal places
+    const hasDecimals = num !== Math.floor(num);
+    
+    // Format with proper decimal places - only show if necessary
+    const formatted = num.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: hasDecimals ? maxDecimals : 0
+    });
+    
+    return formatted;
+  };
+  
+  const formatQuantity = (order: RuneOrder) => {
+    const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+    if (!token) return formatNumber(order.quantity, 0);
+    const decimals = token.decimals || 0;
+    return formatNumber(+order.quantity / 10 ** decimals, decimals > 0 ? Math.min(decimals, 6) : 0);
+  };
 
   const filteredOrders = orders.filter(order => {
     if (selectedToken && order.rune !== selectedToken) return false;
@@ -255,19 +310,115 @@ export function OrderList() {
         <div className="flex gap-4">
           <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="flex flex-col h-[calc(100vh-10rem)]">
-              <div className="flex-1 max-h-[50%] overflow-auto" style={{ display: 'block' }}>
-                <OrderTable
-                  orders={askOrders}
-                  title="Ask Orders"
-                  type="ask"
-                  searchTerm={searchTerm}
-                  onDeleteOrder={handleDeleteOrder}
-                  className="h-full rounded-none border-0 flex flex-col"
-                  headerPosition="top"
-                  showColumnHeaders={true}
-                />
+              {/* Ask Orders Section */}
+              <div className="flex-1 max-h-[50%] flex flex-col">
+                <div className="sticky top-0 z-10 bg-white">
+                  <div className="px-3 py-1.5 border-b border-gray-100 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-gray-900">Ask Orders</h3>
+                        <span className="text-xs text-gray-500">{askOrders.length} orders</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs">
+                          <span className="font-medium text-gray-500">Total:</span>
+                          <span className="ml-1 font-medium text-gray-900">
+                            {formatNumber(askOrders.reduce((sum, order) => {
+                              const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+                              const decimals = token?.decimals || 0;
+                              return sum + (+order.quantity / (10 ** decimals));
+                            }, 0), 4)}
+                          </span>
+                        </div>
+                        <div className="text-xs">
+                          <span className="font-medium text-gray-500">Value:</span>
+                          <span className="ml-1 font-medium text-gray-900">
+                            {formatNumber(askOrders.reduce((sum, order) => {
+                              const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+                              const decimals = token?.decimals || 0;
+                              const qty = +order.quantity / (10 ** decimals);
+                              const price = parseFloat(order.price) / 10000;
+                              return sum + (qty * price);
+                            }, 0), 8)} BTC
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex mt-1.5">
+                      <div className="w-[35%]">
+                        <span className="text-xs font-medium text-gray-500">Token</span>
+                      </div>
+                      <div className="w-[20%] text-right">
+                        <span className="text-xs font-medium text-gray-500">Qty</span>
+                      </div>
+                      <div className="w-[20%] text-right">
+                        <span className="text-xs font-medium text-gray-500">Price</span>
+                      </div>
+                      <div className="w-[15%] text-right">
+                        <span className="text-xs font-medium text-gray-500">Filled</span>
+                      </div>
+                      <div className="w-[10%]"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="overflow-auto">
+                  <div className="min-h-full">
+                    <table className="min-w-full">
+                      <tbody className="divide-y divide-gray-100">
+                        {[...askOrders].reverse().map((order) => {
+                          const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+                          const progress = order.filledQuantity ? (+order.filledQuantity / +order.quantity) * 100 : 0;
+                          return (
+                            <tr key={order.id} className="hover:bg-gray-50 relative">
+                              <td className="w-[35%] px-3 py-2 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <img
+                                    src={token?.icon ?? ''}
+                                    alt={token?.symbol ?? ''}
+                                    className="w-5 h-5 rounded-full"
+                                  />
+                                  <div>
+                                    <span className="font-medium text-sm text-gray-900">{token?.symbol || order.rune}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm text-gray-900">
+                                {formatQuantity(order)}
+                              </td>
+                              <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm font-medium text-red-500">
+                                {formatNumber(parseFloat(order.price) / 10000, 4)}
+                              </td>
+                              <td className="w-[15%] px-3 py-2 text-right whitespace-nowrap">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-xs font-medium text-gray-500">{progress.toFixed(2)}%</span>
+                                  {progress > 0 && (
+                                    <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                      <div
+                                        className="h-full bg-red-500"
+                                        style={{ width: `${progress}%` }}
+                                      ></div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="w-[10%] px-3 py-2 text-right whitespace-nowrap">
+                                <button
+                                  onClick={() => onDeleteOrder(order.id!)}
+                                  className="text-gray-400 hover:text-red-500 transition-colors"
+                                  aria-label="Delete order"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-
+              
               {/* Spread indicator */}
               {askOrders.length > 0 && bidOrders.length > 0 && (
                 <div className="px-3 py-1.5 border-y border-gray-100 bg-gray-50/75">
@@ -280,20 +431,102 @@ export function OrderList() {
                 </div>
               )}
 
-              <div className="flex-1 max-h-[50%] overflow-auto" style={{ display: 'block' }}>
-                <OrderTable
-                  orders={bidOrders}
-                  title="Bid Orders"
-                  type="bid"
-                  searchTerm={searchTerm}
-                  onDeleteOrder={handleDeleteOrder}
-                  className="h-full rounded-none border-0"
-                  headerPosition="bottom"
-                  showColumnHeaders={false}
-                />
+              {/* Bid Orders Section */}
+              <div className="flex-1 max-h-[50%] flex flex-col">
+                <div className="overflow-auto">
+                  <div className="min-h-full">
+                    <table className="min-w-full">
+                      <tbody className="divide-y divide-gray-100">
+                        {bidOrders.map((order) => {
+                          const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+                          const progress = order.filledQuantity ? (+order.filledQuantity / +order.quantity) * 100 : 0;
+                          return (
+                            <tr key={order.id} className="hover:bg-gray-50 relative">
+                              <td className="w-[35%] px-3 py-2 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <img
+                                    src={token?.icon ?? ''}
+                                    alt={token?.symbol ?? ''}
+                                    className="w-5 h-5 rounded-full"
+                                  />
+                                  <div>
+                                    <span className="font-medium text-sm text-gray-900">{token?.symbol || order.rune}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm text-gray-900">
+                                {formatQuantity(order)}
+                              </td>
+                              <td className="w-[20%] px-3 py-2 text-right whitespace-nowrap text-sm font-medium text-green-500">
+                                {formatNumber(parseFloat(order.price) / 10000, 4)}
+                              </td>
+                              <td className="w-[15%] px-3 py-2 text-right whitespace-nowrap">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-xs font-medium text-gray-500">{progress.toFixed(2)}%</span>
+                                  {progress > 0 && (
+                                    <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                      <div
+                                        className="h-full bg-green-500"
+                                        style={{ width: `${progress}%` }}
+                                      ></div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="w-[10%] px-3 py-2 text-right whitespace-nowrap">
+                                <button
+                                  onClick={() => onDeleteOrder(order.id!)}
+                                  className="text-gray-400 hover:text-red-500 transition-colors"
+                                  aria-label="Delete order"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="sticky bottom-0 z-10 bg-white">
+                  <div className="px-3 py-1.5 border-t border-gray-100 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-gray-900">Bid Orders</h3>
+                        <span className="text-xs text-gray-500">{bidOrders.length} orders</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs">
+                          <span className="font-medium text-gray-500">Total:</span>
+                          <span className="ml-1 font-medium text-gray-900">
+                            {formatNumber(bidOrders.reduce((sum, order) => {
+                              const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+                              const decimals = token?.decimals || 0;
+                              return sum + (+order.quantity / (10 ** decimals));
+                            }, 0), 4)}
+                          </span>
+                        </div>
+                        <div className="text-xs">
+                          <span className="font-medium text-gray-500">Value:</span>
+                          <span className="ml-1 font-medium text-gray-900">
+                            {formatNumber(bidOrders.reduce((sum, order) => {
+                              const token = AVAILABLE_TOKENS.find(t => t.name === order.rune);
+                              const decimals = token?.decimals || 0;
+                              const qty = +order.quantity / (10 ** decimals);
+                              const price = parseFloat(order.price) / 10000;
+                              return sum + (qty * price);
+                            }, 0), 8)} BTC
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div><div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
+          </div>
+          <div className="w-[400px] h-[calc(100vh-10rem)] flex flex-col gap-3">
             <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200" style={{ maxHeight: '450px' }}>
               <BatchOrderForm
                 balances={balances}
