@@ -1,5 +1,5 @@
-import { Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Search, Trash2, AlertTriangle } from 'lucide-react';
+import { useMemo, useState, useCallback } from 'react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { useMain } from '../context/MainContext';
 import { RuneOrder } from '../types/api';
@@ -188,9 +188,11 @@ function OrderTable({ orders, title, type, searchTerm = '', onDeleteOrder, class
 export function OrderList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
-  const { orders, deleteOrder, refreshOrders, outputsHealth, balances } = useMain();
+  const { orders, deleteOrder, deleteBatchOrders, refreshOrders, outputsHealth, balances } = useMain();
   const defaultToken = AVAILABLE_TOKENS.find(token => token.symbol !== 'BTC')?.name || null;
   const [selectedToken, setSelectedToken] = useState<string | null>(defaultToken);
+  const [showAskConfirmation, setShowAskConfirmation] = useState(false);
+  const [showBidConfirmation, setShowBidConfirmation] = useState(false);
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
@@ -244,6 +246,30 @@ export function OrderList() {
   const bidOrders = filteredOrders
     .filter(order => order.type === 'bid')
     .sort((a, b) => +b.price - +a.price); // descending
+
+  const handleRemoveAllAskOrders = useCallback(async () => {
+    if (askOrders.length === 0) return;
+    
+    try {
+      const orderIds = askOrders.map(order => order.id!);
+      await deleteBatchOrders(orderIds);
+      setShowAskConfirmation(false);
+    } catch (error) {
+      console.error('Failed to remove all ask orders:', error);
+    }
+  }, [askOrders, deleteBatchOrders]);
+
+  const handleRemoveAllBidOrders = useCallback(async () => {
+    if (bidOrders.length === 0) return;
+    
+    try {
+      const orderIds = bidOrders.map(order => order.id!);
+      await deleteBatchOrders(orderIds);
+      setShowBidConfirmation(false);
+    } catch (error) {
+      console.error('Failed to remove all bid orders:', error);
+    }
+  }, [bidOrders, deleteBatchOrders]);
 
   const hasLowLiquidityAssets = useMemo(() => {
     if (!outputsHealth) return false;
@@ -318,6 +344,15 @@ export function OrderList() {
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-medium text-gray-900">Ask Orders</h3>
                         <span className="text-xs text-gray-500">{askOrders.length} orders</span>
+                        {askOrders.length > 0 && (
+                          <button
+                            onClick={() => setShowAskConfirmation(true)}
+                            className="ml-2 text-xs text-red-500 hover:text-red-700 font-medium transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Remove All
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-xs">
@@ -344,21 +379,7 @@ export function OrderList() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex mt-1.5">
-                      <div className="w-[35%]">
-                        <span className="text-xs font-medium text-gray-500">Token</span>
-                      </div>
-                      <div className="w-[20%] text-right">
-                        <span className="text-xs font-medium text-gray-500">Qty</span>
-                      </div>
-                      <div className="w-[20%] text-right">
-                        <span className="text-xs font-medium text-gray-500">Price</span>
-                      </div>
-                      <div className="w-[15%] text-right">
-                        <span className="text-xs font-medium text-gray-500">Filled</span>
-                      </div>
-                      <div className="w-[10%]"></div>
-                    </div>
+                    {/* Column headers moved to spread bar */}
                   </div>
                 </div>
                 <div className="overflow-auto">
@@ -419,17 +440,33 @@ export function OrderList() {
                 </div>
               </div>
               
-              {/* Spread indicator */}
-              {askOrders.length > 0 && bidOrders.length > 0 && (
-                <div className="px-3 py-1.5 border-y border-gray-100 bg-gray-50/75">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-medium text-gray-500">Spread</span>
+              {/* Spread indicator with column headers - all on one row */}
+              <div className="px-3 py-1.5 border-y border-gray-100 bg-gray-50/75">
+                <div className="flex items-center">
+                  <div className="flex items-center mr-4">
+                    <span className="text-xs font-medium text-gray-500 mr-2">Spread:</span>
                     <span className="text-xs font-medium text-gray-900">
-                      {askOrders[0] && bidOrders[0] ? ((+askOrders[0].price - +bidOrders[0].price) / +askOrders[0].price * 100).toFixed(2) + '%' : '-'}
+                      {askOrders.length > 0 && bidOrders.length > 0 && askOrders[0] && bidOrders[0] 
+                        ? ((+askOrders[0].price - +bidOrders[0].price) / +askOrders[0].price * 100).toFixed(2) + '%' 
+                        : '-'}
                     </span>
                   </div>
+                  
+                  <div className="w-[35%] ml-4">
+                    <span className="text-xs font-medium text-gray-500">Token</span>
+                  </div>
+                  <div className="w-[20%] text-right">
+                    <span className="text-xs font-medium text-gray-500">Qty</span>
+                  </div>
+                  <div className="w-[20%] text-right">
+                    <span className="text-xs font-medium text-gray-500">Price</span>
+                  </div>
+                  <div className="w-[15%] text-right">
+                    <span className="text-xs font-medium text-gray-500">Filled</span>
+                  </div>
+                  <div className="w-[10%]"></div>
                 </div>
-              )}
+              </div>
 
               {/* Bid Orders Section */}
               <div className="flex-1 max-h-[50%] flex flex-col">
@@ -495,6 +532,15 @@ export function OrderList() {
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-medium text-gray-900">Bid Orders</h3>
                         <span className="text-xs text-gray-500">{bidOrders.length} orders</span>
+                        {bidOrders.length > 0 && (
+                          <button
+                            onClick={() => setShowBidConfirmation(true)}
+                            className="ml-2 text-xs text-red-500 hover:text-red-700 font-medium transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Remove All
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-xs">
@@ -543,6 +589,59 @@ export function OrderList() {
       )}
       {activeView === 'transactions' && <TransactionList searchTerm={searchTerm} />}
       {activeView === 'liquidity' && <LiquidityList />}
+
+      {/* Confirmation Dialogs */}
+      {showAskConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4 text-amber-500">
+              <AlertTriangle className="h-6 w-6 mr-2" />
+              <h3 className="text-lg font-medium">Confirm Deletion</h3>
+            </div>
+            <p className="mb-4">Are you sure you want to remove all {askOrders.length} ask orders? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowAskConfirmation(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemoveAllAskOrders}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
+              >
+                Remove All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBidConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4 text-amber-500">
+              <AlertTriangle className="h-6 w-6 mr-2" />
+              <h3 className="text-lg font-medium">Confirm Deletion</h3>
+            </div>
+            <p className="mb-4">Are you sure you want to remove all {bidOrders.length} bid orders? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowBidConfirmation(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemoveAllBidOrders}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
+              >
+                Remove All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

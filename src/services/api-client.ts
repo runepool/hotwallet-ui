@@ -28,6 +28,7 @@ export interface ApiClient {
   getPendingTransactionById(id: string): Promise<Transaction>;
   deletePendingTransaction(id: string): Promise<void>;
   deleteOrder(orderId: string): Promise<void>;
+  deleteBatchOrders(orderIds: string[]): Promise<void>;
   getLiquidityHealth(): Promise<OutputsHealth>;
   splitAsset(request: SplitAssetRequest): Promise<{ success: boolean; txid?: string; error?: string }>;
   setAutoSplitConfig(config: AutoSplitConfig): Promise<void>;
@@ -275,6 +276,26 @@ export class HttpApiClient implements ApiClient {
         throw new Error('Invalid password');
       }
       throw new Error('Failed to delete order');
+    }
+  }
+  
+  async deleteBatchOrders(orderIds: string[]): Promise<void> {
+    if (!orderIds || orderIds.length === 0) return;
+    
+    const response = await fetch(`${this.baseUrl}/orders`, {
+      method: 'DELETE',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ orderIds })
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid password');
+      }
+      throw new Error('Failed to delete orders in batch');
     }
   }
 

@@ -11,6 +11,7 @@ interface MainContextType {
   isFetchingBalances: boolean;
   error: string | null;
   deleteOrder: (orderId: string) => Promise<void>;
+  deleteBatchOrders: (orderIds: string[]) => Promise<void>;
   refreshOrders: () => Promise<void>;
   refreshBalances: () => Promise<void>;
   outputsHealth: OutputsHealth | null;
@@ -298,6 +299,21 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [refreshOrders]);
+  
+  const deleteBatchOrders = useCallback(async (orderIds: string[]) => {
+    if (!orderIds || orderIds.length === 0) return;
+    
+    try {
+      await apiClient.deleteBatchOrders(orderIds);
+      await refreshOrders();
+    } catch (error) {
+      console.error('Failed to delete orders in batch:', error);
+      addWarning(
+        WarningType.ORDER_ERROR,
+        `Failed to delete ${orderIds.length} orders`
+      );
+    }
+  }, [apiClient, refreshOrders]);
 
   const addOrder = useCallback(async (order: RuneOrder) => {
     try {
@@ -384,6 +400,7 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
     isFetchingBalances,
     error,
     deleteOrder,
+    deleteBatchOrders,
     refreshOrders,
     refreshBalances,
     outputsHealth,
