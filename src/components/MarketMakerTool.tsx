@@ -27,8 +27,8 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
   const [autoRebalancingSpread, setAutoRebalancingSpread] = useState('0.5');
   
   // Market maker settings
-  const [percentOfBalance, setPercentOfBalance] = useState(10); // Default 10% of balance
   const [numberOfOrders, setNumberOfOrders] = useState(5); // Default 5 orders
+  const [customDistributionAmount, setCustomDistributionAmount] = useState<string>('');
   const [priceRange, setPriceRange] = useState({
     min: 0,
     max: 0,
@@ -119,38 +119,69 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
   const previewOrders = useMemo((): RuneOrder[] => {
     if (!selectedToken || !tokenInfo || !selectedTokenBalance) return [];
     
-    // Calculate total quantity to use (percentage of available balance)
-    const balanceValue = parseFloat(selectedTokenBalance.balance) / Math.pow(10, tokenInfo.decimals);
-    const totalQuantity = balanceValue * (percentOfBalance / 100);
-    
-    // Calculate quantity per order
-    const quantityPerOrder = totalQuantity / numberOfOrders;
-    
-    // Calculate price step based on price range and number of orders
-    const priceStep = (priceRange.max - priceRange.min) / (numberOfOrders - 1);
-    
-    const orders: RuneOrder[] = [];
-    
-    for (let i = 0; i < numberOfOrders; i++) {
-      // Calculate price for this order
-      const price = priceRange.min + (i * priceStep);
+    try {
+      // Calculate the total amount to distribute (10% of balance by default)
+      const decimals = tokenInfo.decimals || 0;
+      const rawBalance = selectedTokenBalance.balance;
+      const actualBalance = +rawBalance / (10 ** decimals);
       
-      // Convert price to the format expected by the API (scaled by 10000)
-      const scaledPrice = Math.round(price * 10000).toString();
+      // Use custom amount if set, otherwise use 10% of balance
+      let totalAmount;
+      if (customDistributionAmount !== undefined && customDistributionAmount !== '') {
+        totalAmount = parseFloat(customDistributionAmount);
+      } else {
+        totalAmount = (actualBalance * 10) / 100; // 10% of balance
+      }
       
-      orders.push({
-        id: `preview-${i}`,
-        rune: selectedToken,
-        quantity: Math.round(quantityPerOrder * Math.pow(10, tokenInfo.decimals)).toString(),
-        price: scaledPrice,
-        type: orderType,
-        filledQuantity: '0',
-        createdAt: new Date().toISOString()
-      });
+      const amountPerOrder = totalAmount / numberOfOrders;
+      
+      // Calculate price step based on spread percentage
+      const currentPrice = priceRange.current || 1.0;
+      const spreadAmount = currentPrice * (spreadPercentage / 100);
+      
+      let minPrice, maxPrice;
+      if (orderType === 'ask') {
+        minPrice = currentPrice;
+        maxPrice = currentPrice + spreadAmount;
+      } else {
+        minPrice = currentPrice - spreadAmount;
+        maxPrice = currentPrice;
+      }
+      
+      const priceStep = (maxPrice - minPrice) / (Math.max(numberOfOrders - 1, 1));
+      
+      // Create preview orders
+      const orders: RuneOrder[] = [];
+      
+      for (let i = 0; i < numberOfOrders; i++) {
+        // Calculate price for this order
+        const price = minPrice + (i * priceStep);
+        
+        // Convert to the format expected by the API
+        const priceFormatted = Math.round(price * 10000).toString();
+        
+        // Calculate quantity for this order
+        const quantityRaw = amountPerOrder * Math.pow(10, decimals);
+        const quantity = Math.floor(quantityRaw).toString();
+        
+        // Create the preview order
+        orders.push({
+          id: `preview-${i}`,
+          rune: selectedToken,
+          quantity: quantity,
+          price: priceFormatted,
+          type: orderType,
+          filledQuantity: '0',
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      return orders;
+    } catch (error) {
+      console.error('Error generating preview orders:', error);
+      return [];
     }
-    
-    return orders;
-  }, [selectedToken, tokenInfo, selectedTokenBalance, percentOfBalance, numberOfOrders, priceRange, orderType]);
+  }, [selectedToken, tokenInfo, selectedTokenBalance, numberOfOrders, spreadPercentage, priceRange, orderType, customDistributionAmount]);
   
   // Don't update preview orders in the context - we're not showing them in the order book
   
@@ -197,11 +228,6 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
       return;
     }
     
-    if (percentOfBalance <= 0 || percentOfBalance > 100) {
-      setError('Percentage must be between 1 and 100');
-      return;
-    }
-    
     if (numberOfOrders <= 0) {
       setError('Number of orders must be greater than 0');
       return;
@@ -242,19 +268,22 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
     });
   };
   
-  // State for custom distribution amount
-  const [customDistributionAmount, setCustomDistributionAmount] = useState<string>('');
-  
-  // Calculate the distribution amount based on percentage or custom input
+  // Calculate the distribution amount
   const getDistributionAmount = (): string => {
-    // If customDistributionAmount exists (even if it's '0' or '0.0'), use it
-    if (customDistributionAmount !== undefined && customDistributionAmount !== '') {
+    if (!selectedTokenBalance) return '0';
+    
+    const decimals = tokenInfo?.decimals || 0;
+    const rawBalance = selectedTokenBalance.balance;
+    const actualBalance = +rawBalance / (10 ** decimals);
+    
+    // Use custom amount if set, otherwise use 10% of balance
+    if (customDistributionAmount !== undefined) {
       return customDistributionAmount;
     }
     
-    if (!selectedTokenBalance || !tokenInfo) return '0';
-    
-    return (parseFloat(selectedTokenBalance.balance) * (percentOfBalance / 100) / Math.pow(10, tokenInfo.decimals)).toFixed(4);
+    // Default to 10% of balance
+    const amount = (actualBalance * 10) / 100;
+    return amount.toFixed(4);
   };
   
   if (!selectedToken) {
@@ -381,24 +410,10 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
       
           <div>
             <div className="flex justify-between items-center mb-0.5">
-              <label className="block text-xs text-gray-500">Percentage of Balance</label>
+              <label className="block text-xs text-gray-500">Distribution Amount</label>
               <span className="text-xs text-gray-500">
                 {getDistributionAmount()} {tokenInfo?.symbol || 'tokens'} will be distributed
               </span>
-            </div>
-            <div>
-              <div className="flex items-center">
-                <input
-                  id="percentOfBalance"
-                  type="range"
-                  min="1"
-                  max="100"
-                  value={percentOfBalance}
-                  onChange={(e) => setPercentOfBalance(parseInt(e.target.value))}
-                  className="w-full h-9 px-3 text-sm"
-                />
-                <span className="text-sm font-medium ml-2 w-10 text-right">{percentOfBalance}%</span>
-              </div>
             </div>
           </div>
       
@@ -455,7 +470,7 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
           <div className="flex justify-end mt-4">
             <button
               onClick={handleSubmit}
-              disabled={loading || previewOrders.length === 0}
+              disabled={loading || !selectedToken}
               className={`w-full h-9 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5 text-sm font-medium ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {loading ? (
