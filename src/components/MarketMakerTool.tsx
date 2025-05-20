@@ -1,9 +1,18 @@
+// React and hooks
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Plus, Coins, AlertCircle, ArrowUpDown, Hash } from 'lucide-react';
+
+// UI components
+import { BookOpen, Plus, Coins, AlertCircle, ArrowUpDown } from 'lucide-react';
+
+// Types and constants
 import { AVAILABLE_TOKENS } from '../constants/runes';
-import { useMain } from '../context/MainContext';
 import { RuneOrder, TokenBalance } from '../types/api';
+
+// Context and APIs
+import { useMain } from '../context/MainContext';
 import { getAutoRebalancing, updateAutoRebalancing } from '../api/autoRebalancing';
+
+// Components
 import { AutoRebalancing } from './AutoRebalancing';
 
 interface MarketMakerToolProps {
@@ -14,36 +23,53 @@ interface MarketMakerToolProps {
   onOrderTypeChange: (type: 'ask' | 'bid') => void;
 }
 
+type PriceRange = {
+  min: number;
+  max: number;
+  current: number;
+  inputValue: string;
+};
+
+type OrderDto = {
+  rune: string;
+  quantity: string;
+  price: string;
+  type: 'ask' | 'bid';
+};
+
 export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderType, onOrderTypeChange }: MarketMakerToolProps) {
   const { addOrder } = useMain();
+  
+  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // Auto rebalancing settings
-  const [autoRebalancingEnabled, setAutoRebalancingEnabled] = useState(false);
-  const [autoRebalancingSpread, setAutoRebalancingSpread] = useState('0.5');
-  
   // Market maker settings
   const [numberOfOrders, setNumberOfOrders] = useState(5); // Default 5 orders
   const [customDistributionAmount, setCustomDistributionAmount] = useState<string>('');
-  const [priceRange, setPriceRange] = useState({
+  const [spreadPercentage, setSpreadPercentage] = useState(2); // Default 2% spread
+  const [priceRange, setPriceRange] = useState<PriceRange>({
     min: 0,
     max: 0,
     current: 0,
     inputValue: ''
   });
-  // Update local state when orderType prop changes
-  useEffect(() => {
-    // Update any local state that depends on order type
-  }, [orderType]);
-  const [spreadPercentage, setSpreadPercentage] = useState(2); // Default 2% spread
+  
+  // Auto rebalancing settings
+  const [autoRebalancingEnabled, setAutoRebalancingEnabled] = useState(false);
+  const [autoRebalancingSpread, setAutoRebalancingSpread] = useState('0.5');
   
   // Get the selected token's balance and info
   const selectedTokenBalance = balances.find(b => b.token === selectedToken);
   const tokenInfo = AVAILABLE_TOKENS.find(t => t.name === selectedToken);
+  
+  // Add order type toggle functionality
+  const toggleOrderType = () => {
+    onOrderTypeChange(orderType === 'ask' ? 'bid' : 'ask');
+  };
   
   // Handle outside clicks for token dropdown
   useEffect(() => {
@@ -115,68 +141,70 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
   }, [priceRange.current, spreadPercentage, orderType]);
   
   
+  // Calculate the distribution amount based on balance or custom input
+  const getDistributionAmount = (): string => {
+    if (!selectedTokenBalance) return '0';
+    
+    const decimals = tokenInfo?.decimals || 0;
+    const rawBalance = selectedTokenBalance.balance;
+    const actualBalance = +rawBalance / (10 ** decimals);
+    
+    // Use custom amount if set, otherwise use 10% of balance
+    if (customDistributionAmount !== '') {
+      return customDistributionAmount;
+    }
+    
+    // Default to 10% of balance
+    const amount = (actualBalance * 10) / 100;
+    return amount.toFixed(4);
+  };
+
   // Generate the orders based on settings - memoized to avoid recalculating on every render
   const previewOrders = useMemo((): RuneOrder[] => {
     if (!selectedToken || !tokenInfo || !selectedTokenBalance) return [];
     
     try {
-      // Calculate the total amount to distribute (10% of balance by default)
-      const decimals = tokenInfo.decimals || 0;
-      const rawBalance = selectedTokenBalance.balance;
-      const actualBalance = +rawBalance / (10 ** decimals);
-      
-      // Use custom amount if set, otherwise use 10% of balance
-      let totalAmount;
-      if (customDistributionAmount !== undefined && customDistributionAmount !== '') {
-        totalAmount = parseFloat(customDistributionAmount);
-      } else {
-        totalAmount = (actualBalance * 10) / 100; // 10% of balance
+      // Validate price is set and valid
+      if (!priceRange.inputValue || priceRange.inputValue === '.' || priceRange.current <= 0) {
+        return [];
       }
+      
+      // Calculate the total amount to distribute
+      const totalAmount = parseFloat(getDistributionAmount());
+      if (isNaN(totalAmount) || totalAmount <= 0) return [];
       
       const amountPerOrder = totalAmount / numberOfOrders;
+      const decimals = tokenInfo.decimals || 0;
       
-      // Calculate price step based on spread percentage
-      const currentPrice = priceRange.current || 1.0;
+      // Calculate price range based on spread percentage
+      const currentPrice = priceRange.current;
       const spreadAmount = currentPrice * (spreadPercentage / 100);
       
-      let minPrice, maxPrice;
-      if (orderType === 'ask') {
-        minPrice = currentPrice;
-        maxPrice = currentPrice + spreadAmount;
-      } else {
-        minPrice = currentPrice - spreadAmount;
-        maxPrice = currentPrice;
-      }
+      // Determine min and max price based on order type
+      const [minPrice, maxPrice] = orderType === 'ask' 
+        ? [currentPrice, currentPrice + spreadAmount]
+        : [currentPrice - spreadAmount, currentPrice];
       
-      const priceStep = (maxPrice - minPrice) / (Math.max(numberOfOrders - 1, 1));
+      const priceStep = (maxPrice - minPrice) / Math.max(numberOfOrders - 1, 1);
       
-      // Create preview orders
-      const orders: RuneOrder[] = [];
-      
-      for (let i = 0; i < numberOfOrders; i++) {
-        // Calculate price for this order
+      // Generate orders using Array.from for cleaner code
+      return Array.from({ length: numberOfOrders }, (_, i) => {
         const price = minPrice + (i * priceStep);
-        
-        // Convert to the format expected by the API
         const priceFormatted = Math.round(price * 10000).toString();
         
-        // Calculate quantity for this order
         const quantityRaw = amountPerOrder * Math.pow(10, decimals);
         const quantity = Math.floor(quantityRaw).toString();
         
-        // Create the preview order
-        orders.push({
+        return {
           id: `preview-${i}`,
           rune: selectedToken,
-          quantity: quantity,
+          quantity,
           price: priceFormatted,
           type: orderType,
           filledQuantity: '0',
           createdAt: new Date().toISOString()
-        });
-      }
-      
-      return orders;
+        };
+      });
     } catch (error) {
       console.error('Error generating preview orders:', error);
       return [];
@@ -221,6 +249,9 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
     }
   };
   
+  // State for tracking order creation progress
+  const [orderProgress, setOrderProgress] = useState<number>(0);
+
   // Handle form submission for creating market maker orders
   const handleSubmit = async () => {
     if (!selectedToken) {
@@ -233,24 +264,54 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
       return;
     }
     
+    // Validate price is set and valid
+    if (!priceRange.inputValue || priceRange.inputValue === '.' || priceRange.current <= 0) {
+      setError('Please enter a valid price');
+      return;
+    }
+    
+    // Validate distribution amount
+    const distributionAmount = parseFloat(getDistributionAmount());
+    if (isNaN(distributionAmount) || distributionAmount <= 0) {
+      setError('Please enter a valid distribution amount');
+      return;
+    }
+    
+    if (previewOrders.length === 0) {
+      setError('Unable to create orders with current settings');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setOrderProgress(0);
     
     try {
-      // Create all orders
+      // Create orders one by one to show progress
+      let completedOrders = 0;
+      
       for (const order of previewOrders) {
-        // Create a proper order DTO for the API
-        const orderDto = {
+        const orderDto: OrderDto = {
           rune: order.rune,
           quantity: order.quantity,
           price: order.price,
           type: order.type
         };
+        
+        // Create each order individually
         await addOrder(orderDto);
+        
+        // Update progress
+        completedOrders++;
+        setOrderProgress(completedOrders);
+        
+        // Show intermediate success message
+        setSuccess(`Created ${completedOrders} of ${previewOrders.length} ${orderType === 'ask' ? 'sell' : 'buy'} orders for ${selectedToken}`);
       }
       
-      setSuccess(`Successfully created ${previewOrders.length} ${orderType} orders for ${selectedToken}`);
+      // Final success message
+      setSuccess(`Successfully created all ${previewOrders.length} ${orderType === 'ask' ? 'sell' : 'buy'} orders for ${selectedToken}`);
     } catch (err) {
       console.error('Failed to create market maker orders:', err);
       setError(err instanceof Error ? err.message : 'Failed to create orders');
@@ -259,32 +320,9 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
     }
   };
   
-  // Format balance for display - keeping this for potential future use
-  const formatBalance = (balance: string, decimals: number): string => {
-    const value = parseFloat(balance) / Math.pow(10, decimals);
-    return value.toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 4
-    });
-  };
+  // Removed unused formatBalance function
   
-  // Calculate the distribution amount
-  const getDistributionAmount = (): string => {
-    if (!selectedTokenBalance) return '0';
-    
-    const decimals = tokenInfo?.decimals || 0;
-    const rawBalance = selectedTokenBalance.balance;
-    const actualBalance = +rawBalance / (10 ** decimals);
-    
-    // Use custom amount if set, otherwise use 10% of balance
-    if (customDistributionAmount !== undefined) {
-      return customDistributionAmount;
-    }
-    
-    // Default to 10% of balance
-    const amount = (actualBalance * 10) / 100;
-    return amount.toFixed(4);
-  };
+  // This function is now moved above the previewOrders declaration
   
   if (!selectedToken) {
     return (
@@ -299,6 +337,18 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
       <div className="p-3 flex flex-col space-y-3">
         
         <div className="flex items-center gap-3">
+          {/* Order Type Toggle */}
+          <div className="flex-initial">
+            <button
+              type="button"
+              onClick={toggleOrderType}
+              className={`h-9 px-4 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm font-medium ${orderType === 'ask' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+            >
+              {orderType === 'ask' ? 'Sell' : 'Buy'}
+            </button>
+          </div>
+
+          {/* Token Selector */}
           <div className="flex-1">
             <div className="relative" ref={dropdownRef}>
               <button
@@ -359,25 +409,32 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
       </div>
       
       <div className="flex-1 p-3">
+        {/* Status Messages */}
         {error && (
-          <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1 text-sm">
-            <AlertCircle className="w-4 h-4" />
+          <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 rounded-md flex items-center gap-1 text-sm animate-fadeIn">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
         
         {success && (
-          <div className="mb-3 px-3 py-2 bg-green-50 text-green-700 rounded-md flex items-center gap-1 text-sm">
-            <BookOpen className="w-4 h-4" />
+          <div className="mb-3 px-3 py-2 bg-green-50 text-green-700 rounded-md flex items-center gap-1 text-sm animate-fadeIn">
+            <BookOpen className="w-4 h-4 flex-shrink-0" />
             <span>{success}</span>
           </div>
         )}
         
         <div className="space-y-2">
       
+          {/* Price Input */}
           <div>
-            <label htmlFor="currentPrice" className="block text-xs text-gray-500 mb-1">Current Price (sats)</label>
-            <div>
+            <div className="flex justify-between items-center mb-0.5">
+              <label htmlFor="currentPrice" className="block text-xs text-gray-500">Current Price (sats)</label>
+              <span className="text-xs text-gray-500">
+                {orderType === 'ask' ? 'Selling above this price' : 'Buying below this price'}
+              </span>
+            </div>
+            <div className="relative">
               <input
                 id="currentPrice"
                 type="text"
@@ -403,8 +460,11 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
                   }
                 }}
                 placeholder="100.000"
-                className="w-full h-9 px-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full h-9 px-3 text-sm bg-white border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${orderType === 'ask' ? 'border-red-200' : 'border-green-200'}`}
               />
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500">
+                sats
+              </div>
             </div>
           </div>
       
@@ -467,18 +527,35 @@ export function MarketMakerTool({ selectedToken, balances, onTokenSelect, orderT
       
 
       
-          <div className="flex justify-end mt-4">
+          {/* Submit Button with Progress */}
+          <div className="flex flex-col mt-4 w-full">
+            {loading && orderProgress > 0 && (
+              <div className="mb-2">
+                <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${orderType === 'ask' ? 'bg-red-500' : 'bg-green-500'} rounded-full transition-all duration-300 ease-in-out`}
+                    style={{ width: `${(orderProgress / previewOrders.length) * 100}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1 text-center">
+                  Creating order {orderProgress} of {previewOrders.length}
+                </div>
+              </div>
+            )}
             <button
               onClick={handleSubmit}
-              disabled={loading || !selectedToken}
-              className={`w-full h-9 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5 text-sm font-medium ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={loading || !selectedToken || previewOrders.length === 0}
+              className={`w-full h-9 px-4 ${orderType === 'ask' ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'} text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 flex items-center justify-center gap-1.5 text-sm font-medium ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {loading ? (
-                <ArrowUpDown className="w-4 h-4 animate-spin" />
+                <>
+                  <ArrowUpDown className="w-4 h-4 animate-spin mr-2" />
+                  <span>{orderProgress === 0 ? 'Creating orders...' : `Creating order ${orderProgress} of ${previewOrders.length}`}</span>
+                </>
               ) : (
                 <>
                   <Plus className="w-4 h-4" />
-                  <span>Create {numberOfOrders} {orderType} Orders</span>
+                  <span>Create {numberOfOrders} {orderType === 'ask' ? 'Sell' : 'Buy'} Orders</span>
                 </>
               )}
             </button>

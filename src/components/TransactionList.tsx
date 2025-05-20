@@ -5,7 +5,7 @@ import { Transaction, TransactionStatus } from '../types/api';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 
 type TransactionListProps = {
-  searchTerm: string;
+  searchTerm?: string;
 };
 
 export function TransactionList({ searchTerm }: TransactionListProps) {

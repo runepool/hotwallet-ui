@@ -1,4 +1,4 @@
-import { Search, Trash2, AlertTriangle, BookOpen, Plus } from 'lucide-react';
+import { Trash2, AlertTriangle, BookOpen, Plus } from 'lucide-react';
 import { useMemo, useState, useCallback } from 'react';
 import { AVAILABLE_TOKENS } from '../constants/runes';
 import { useMain } from '../context/MainContext';
@@ -11,7 +11,6 @@ import { TransactionList } from './TransactionList';
 
 
 export function OrderList() {
-  const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'orders' | 'transactions' | 'liquidity'>('orders');
   const [activeTab, setActiveTab] = useState<'placeOrder' | 'marketMaker'>('placeOrder');
   const [batchOrderType, setBatchOrderType] = useState<'ask' | 'bid'>('ask');
@@ -56,14 +55,7 @@ export function OrderList() {
 
   const filteredOrders = orders.filter(order => {
     if (selectedToken && order.rune !== selectedToken) return false;
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      order.rune.toLowerCase().includes(searchLower) ||
-      order.type.toLowerCase().includes(searchLower) ||
-      order.quantity.toString().includes(searchLower) ||
-      order.price.toString().includes(searchLower)
-    );
+    return true;
   });
 
   const askOrders = filteredOrders
@@ -142,18 +134,7 @@ export function OrderList() {
           </button>
         </div>
 
-        <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder={`Search ${activeView} by token, quantity, or price...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+        {/* Search bar removed */}
       </div>
 
       {activeView === 'orders' && (
@@ -497,7 +478,7 @@ export function OrderList() {
           </div>
         </div>
       )}
-      {activeView === 'transactions' && <TransactionList searchTerm={searchTerm} />}
+      {activeView === 'transactions' && <TransactionList />}
       {activeView === 'liquidity' && <LiquidityList />}
 
       {/* Confirmation Dialogs */}

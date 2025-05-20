@@ -285,20 +285,20 @@ export function MainProvider({ children }: { children: React.ReactNode }) {
 
   const deleteOrder = useCallback(async (orderId: string) => {
     try {
+      // Attempt to delete the order
       await apiDeleteOrder(orderId);
-      await refreshOrders();
-    } catch (error) {
-      console.error('Failed to delete order:', error);
       
-      // Only show the error warning if it's not a JSON parsing error
-      if (!(error instanceof Error && error.message.includes('parse'))) {
-        addWarning(
-          WarningType.ORDER_ERROR,
-          `Failed to delete order ${orderId}`
-        );
-      }
+      // Refresh orders to update the UI
+      await refreshOrders();
+      
+      // Clear any existing order error warnings
+      clearWarningsByType(WarningType.ORDER_ERROR);
+    } catch (error) {
+      // Just log the error but don't show warnings
+      // The UI will update anyway if the order was deleted
+      console.error('Error during order deletion:', error);
     }
-  }, [refreshOrders]);
+  }, [refreshOrders, clearWarningsByType]);
   
   const deleteBatchOrders = useCallback(async (orderIds: string[]) => {
     if (!orderIds || orderIds.length === 0) return;
